@@ -31,6 +31,19 @@ export async function insertCall(input: {
   return data;
 }
 
+export async function setVapiCallId(
+  callId: string,
+  vapiCallId: string,
+  status?: string | null,
+): Promise<void> {
+  const db = serviceClient();
+  const { error } = await db
+    .from("calls")
+    .update({ vapi_call_id: vapiCallId, status: status ?? "queued" })
+    .eq("id", callId);
+  if (error) throw error;
+}
+
 export async function findByVapiCallId(vapiCallId: string): Promise<CallRow | null> {
   const db = serviceClient();
   const { data, error } = await db

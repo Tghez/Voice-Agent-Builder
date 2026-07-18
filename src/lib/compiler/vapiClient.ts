@@ -18,6 +18,8 @@ export interface CreateCallPayload {
   phoneNumberId: string;
   customer: { number: string; name?: string };
   assistantOverrides?: { variableValues?: Record<string, string> };
+  /** Echoed back on webhooks (message.call.metadata) for correlation. */
+  metadata?: Record<string, string>;
 }
 
 export interface VapiClient {
