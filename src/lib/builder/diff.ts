@@ -17,8 +17,23 @@ export interface SpecDiff {
   summary: string[];
 }
 
+/**
+ * Stable, key-order-insensitive stringify. The DB returns jsonb with arbitrary
+ * key order, so a plain JSON.stringify would false-positive a "change" when
+ * comparing a loaded spec against a freshly-parsed one.
+ */
 function j(v: unknown): string {
-  return typeof v === "string" ? v : JSON.stringify(v);
+  if (typeof v === "string") return v;
+  return JSON.stringify(v, (_, val) =>
+    val && typeof val === "object" && !Array.isArray(val)
+      ? Object.keys(val)
+          .sort()
+          .reduce<Record<string, unknown>>((acc, k) => {
+            acc[k] = (val as Record<string, unknown>)[k];
+            return acc;
+          }, {})
+      : val,
+  );
 }
 
 export function diffSpecs(before: AgentSpec | null, after: AgentSpec): SpecDiff {

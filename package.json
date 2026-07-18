@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "node --env-file=.env.local --import tsx scripts/seed.ts",
-    "assistant:create": "node --env-file=.env.local --import tsx scripts/createAssistant.ts"
+    "assistant:create": "node --env-file=.env.local --import tsx scripts/createAssistant.ts",
+    "builder:smoke": "node --env-file=.env.local --import tsx scripts/builderSmoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",
