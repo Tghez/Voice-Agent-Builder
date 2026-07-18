@@ -26,6 +26,8 @@ export const env = {
   anthropicKey: (): string => required("ANTHROPIC_API_KEY"),
   builderModel: (): string => process.env.BUILDER_MODEL ?? "claude-sonnet-5",
   incallModel: (): string => process.env.INCALL_MODEL ?? "claude-haiku-4-5-20251001",
+  /** Bare Haiku alias for direct SDK calls (text-mode evals mirror the voice agent). */
+  incallModelSdk: (): string => process.env.INCALL_MODEL_SDK ?? "claude-haiku-4-5",
 
   // Vapi
   vapiKey: (): string => required("VAPI_API_KEY"),
