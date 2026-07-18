@@ -78,3 +78,13 @@ export class MockCalendar implements CalendarProvider {
     };
   }
 }
+
+/**
+ * Provider factory. Cal.com (real) when configured, mock otherwise. CalcomCalendar
+ * is wired when CALCOM_API_KEY is set; until then the mock keeps the loop working
+ * (and text-mode evals always use the mock).
+ */
+export function getCalendar(): CalendarProvider {
+  // TODO(cal.com): return new CalcomCalendar() when CALCOM_API_KEY is present.
+  return new MockCalendar();
+}

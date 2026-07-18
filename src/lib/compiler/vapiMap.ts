@@ -1,4 +1,4 @@
-import { INCALL_MODEL } from "@/lib/config";
+import { env } from "@/lib/env";
 import type { AgentSpec, Criterion, RuntimeTool, Voice } from "@/lib/spec/schema";
 import { renderPrompt } from "./renderPrompt";
 
@@ -138,7 +138,7 @@ export function buildVapiAssistant(spec: AgentSpec, opts: BuildOptions) {
     firstMessage: spec.identity.firstMessage,
     model: {
       provider: "anthropic",
-      model: INCALL_MODEL,
+      model: env.incallModel(),
       temperature: 0.4,
       messages: [{ role: "system", content: renderPrompt(spec) }],
       tools: spec.actions.map((t) => toVapiTool(spec, t, toolsUrl)),

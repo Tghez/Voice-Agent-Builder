@@ -4,11 +4,11 @@
  *
  * Run: npm run assistant:create
  */
-import { serviceClient } from "../src/lib/db/client";
 import { RealVapiClient } from "../src/lib/compiler/vapiClient";
 import { syncSpecToVapi } from "../src/lib/compiler/compile";
 import { AgentSpecSchema, type AgentSpec } from "../src/lib/spec/schema";
-import { baseUrl } from "../src/lib/config";
+import { createAgentWithSpec } from "../src/lib/db/repositories/agents";
+import { env } from "../src/lib/env";
 
 function sampleSpec(): AgentSpec {
   return AgentSpecSchema.parse({
@@ -43,25 +43,14 @@ async function main() {
   const client = new RealVapiClient();
 
   const { assistantId, vapiObject, spec: synced } = await syncSpecToVapi(spec, client, {
-    baseUrl: baseUrl(),
+    baseUrl: env.baseUrl(),
   });
 
-  const db = serviceClient();
-  const { data: agent, error: aerr } = await db
-    .from("agents")
-    .insert({ name: synced.identity.name, current_version: synced.version, vapi_assistant_id: assistantId })
-    .select()
-    .single();
-  if (aerr) throw aerr;
-
-  const { error: serr } = await db
-    .from("agent_specs")
-    .insert({ agent_id: agent.id, version: synced.version, spec: synced, vapi_assistant_id: assistantId });
-  if (serr) throw serr;
+  const { agentId } = await createAgentWithSpec(synced, assistantId);
 
   console.log("Milestone reached: spec -> real Vapi assistant");
   console.log("  assistantId:", assistantId);
-  console.log("  agentId:    ", agent.id);
+  console.log("  agentId:    ", agentId);
   console.log("  tools:      ", vapiObject.model.tools.map((t) => t.function.name).join(", "));
   console.log("  compiled prompt (head):");
   console.log(

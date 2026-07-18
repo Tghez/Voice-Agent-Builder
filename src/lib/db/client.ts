@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { env } from "@/lib/env";
 
 /**
  * Supabase clients. `serviceClient` uses the service-role key for server-side
@@ -10,17 +11,12 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 let _service: SupabaseClient | null = null;
 
 export function serviceClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error(
-      "Supabase not configured: set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY",
-    );
-  }
   // Tolerate a pasted REST endpoint or trailing slash — createClient wants the base URL.
-  const baseUrl = url.replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
+  const url = env.supabaseUrl().replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
   if (!_service) {
-    _service = createClient(baseUrl, key, { auth: { persistSession: false } });
+    _service = createClient(url, env.supabaseServiceKey(), {
+      auth: { persistSession: false },
+    });
   }
   return _service;
 }

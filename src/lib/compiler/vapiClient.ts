@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 /**
  * Thin Vapi REST wrapper. The interface exists so the compiler and call service
  * can be unit-tested against a fake, and so ALL Vapi HTTP lives behind one seam.
@@ -27,14 +29,17 @@ export interface VapiClient {
 const VAPI_BASE = "https://api.vapi.ai";
 
 export class RealVapiClient implements VapiClient {
-  constructor(private apiKey: string = process.env.VAPI_API_KEY ?? "") {}
+  constructor(private apiKey?: string) {}
+
+  private key(): string {
+    return this.apiKey ?? env.vapiKey();
+  }
 
   private async req<T>(method: string, path: string, body?: unknown): Promise<T> {
-    if (!this.apiKey) throw new Error("VAPI_API_KEY is not set");
     const res = await fetch(`${VAPI_BASE}${path}`, {
       method,
       headers: {
-        Authorization: `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.key()}`,
         "Content-Type": "application/json",
       },
       body: body === undefined ? undefined : JSON.stringify(body),

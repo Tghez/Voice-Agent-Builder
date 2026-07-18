@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import { SEED_LEADS } from "./seedLeads";
 
 /**
@@ -28,7 +29,7 @@ export interface CRMProvider {
 
 /** Every lead's phone routes here — we never dial a real prospect. */
 export function demoPhone(): string {
-  return process.env.DEMO_PHONE ?? "+10000000000";
+  return env.demoPhone();
 }
 
 /**
@@ -61,4 +62,33 @@ export class MockCRM implements CRMProvider {
   async getLead(id: string): Promise<Lead | null> {
     return this.leads.find((l) => l.id === id) ?? null;
   }
+}
+
+/** Supabase-backed CRM. Phones are forced to DEMO_PHONE on read (belt-and-suspenders). */
+export class SupabaseCRM implements CRMProvider {
+  async listLeads(): Promise<Lead[]> {
+    const { serviceClient } = await import("@/lib/db/client");
+    const { data, error } = await serviceClient()
+      .from("leads")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    const phone = demoPhone();
+    return (data ?? []).map((l) => ({ ...(l as Lead), phone }));
+  }
+  async getLead(id: string): Promise<Lead | null> {
+    const { serviceClient } = await import("@/lib/db/client");
+    const { data, error } = await serviceClient()
+      .from("leads")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? { ...(data as Lead), phone: demoPhone() } : null;
+  }
+}
+
+/** Provider factory: real CRM when Supabase is configured, mock otherwise. */
+export function getCRM(): CRMProvider {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL ? new SupabaseCRM() : new MockCRM();
 }
