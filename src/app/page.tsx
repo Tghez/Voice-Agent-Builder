@@ -39,6 +39,8 @@ export default function BuilderPage() {
 
   async function send(text: string) {
     if (!text.trim() || loading) return;
+    // Prior turns of this session (before adding the current one) = the history.
+    const history = messages.map((m) => ({ role: m.role, content: m.text }));
     setMessages((m) => [...m, { role: "user", text }]);
     setInput("");
     setLoading(true);
@@ -46,7 +48,7 @@ export default function BuilderPage() {
       const res = await fetch("/api/builder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, agentId }),
+        body: JSON.stringify({ message: text, agentId, history }),
       });
       const data = await res.json();
       if (data.error) {

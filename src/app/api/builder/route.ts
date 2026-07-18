@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { builderGraph } from "@/lib/builder/graph";
 import { emptySpec, type AgentSpec } from "@/lib/spec/schema";
 import { getAgent, getCurrentSpec } from "@/lib/db/repositories/agents";
+import type { ChatTurn } from "@/lib/builder/state";
 
 /**
  * One chat turn → one graph invocation. For edits to an existing agent we load
@@ -12,6 +13,19 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const message = String(body?.message ?? "").trim();
   const agentId: string | undefined = body?.agentId || undefined;
+  // Full chat history of THIS assistant-creation session (from the client),
+  // threaded into every node so the graph has conversation memory.
+  const history: ChatTurn[] = Array.isArray(body?.history)
+    ? body.history
+        .filter(
+          (h: unknown): h is ChatTurn =>
+            !!h &&
+            typeof h === "object" &&
+            (((h as ChatTurn).role === "user") || ((h as ChatTurn).role === "assistant")) &&
+            typeof (h as ChatTurn).content === "string",
+        )
+        .slice(-20)
+    : [];
   if (!message) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
@@ -30,6 +44,7 @@ export async function POST(req: Request) {
   try {
     const result = await builderGraph.invoke({
       userMessage: message,
+      history,
       agentId,
       workingSpec,
       prevSpec,

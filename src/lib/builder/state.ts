@@ -4,13 +4,21 @@ import type { SpecDiff } from "./diff";
 
 export type Route = "edit" | "question" | "test_call" | "chitchat";
 
+/** One prior chat turn in this assistant-creation session. */
+export type ChatTurn = { role: "user" | "assistant"; content: string };
+
 /**
  * Builder graph state. One invocation per user turn (inline clarifier, no
- * checkpointer): the next user message is a fresh invocation over full history.
+ * checkpointer): each invocation runs over the FULL chat history of this
+ * assistant-creation session (supplied by the caller), so every node — router,
+ * clarifier, editor, responder — sees what was said before (e.g. the clarifier
+ * remembers the question it asked and the user's answer).
  */
 export const BuilderAnnotation = Annotation.Root({
   // Inputs
   userMessage: Annotation<string>(),
+  /** Prior turns of THIS session (not including the current userMessage). */
+  history: Annotation<ChatTurn[]>(),
   agentId: Annotation<string | undefined>(),
   workingSpec: Annotation<AgentSpec>(),
   prevSpec: Annotation<AgentSpec | null>(),

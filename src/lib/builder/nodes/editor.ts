@@ -3,6 +3,7 @@ import { getAnthropic } from "@/lib/llm/client";
 import { env } from "@/lib/env";
 import { applyToSpec, type BuilderToolName } from "@/lib/spec/apply";
 import { BUILDER_TOOLS } from "../tools";
+import { historyToMessages } from "../history";
 import type { BuilderState } from "../state";
 
 /**
@@ -32,9 +33,12 @@ export async function editorNode(state: BuilderState): Promise<Partial<BuilderSt
   const spec = state.workingSpec; // mutated in place
   const client = getAnthropic();
   const toolLog: string[] = [];
-  const messages: Anthropic.MessageParam[] = [
-    { role: "user", content: state.userMessage },
-  ];
+  // Start from the full session history so the editor applies edits in context
+  // (e.g. the criteria the user gave in answer to the clarifier's question).
+  const messages: Anthropic.MessageParam[] = historyToMessages(
+    state.history,
+    state.userMessage,
+  );
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const resp = await client.messages.create({

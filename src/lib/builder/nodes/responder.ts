@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropic } from "@/lib/llm/client";
 import { env } from "@/lib/env";
+import { historyToMessages } from "../history";
 import type { BuilderState } from "../state";
 
 /**
@@ -21,14 +22,8 @@ export async function responderNode(state: BuilderState): Promise<Partial<Builde
   const resp = await getAnthropic().messages.create({
     model: env.builderModel(),
     max_tokens: 1024,
-    system:
-      "You are the builder assistant for a voice sales agent. Answer the user's question concisely using the provided spec. If they just greet you, greet back and offer to help build or edit the agent.",
-    messages: [
-      {
-        role: "user",
-        content: `Current spec:\n${JSON.stringify(state.workingSpec, null, 2)}\n\nUser:\n${state.userMessage}`,
-      },
-    ],
+    system: `You are the builder assistant for a voice sales agent. Answer the user's question concisely using the conversation and the current spec. If they just greet you, greet back and offer to help build or edit the agent.\n\nCurrent spec:\n${JSON.stringify(state.workingSpec, null, 2)}`,
+    messages: historyToMessages(state.history, state.userMessage),
   });
 
   const text = resp.content

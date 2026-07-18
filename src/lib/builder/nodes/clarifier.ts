@@ -2,6 +2,7 @@ import { z } from "zod/v4";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "@/lib/llm/client";
 import { env } from "@/lib/env";
+import { historyToMessages } from "../history";
 import type { BuilderState } from "../state";
 
 /**
@@ -16,21 +17,18 @@ const ClarifySchema = z.object({
   question: z.string().describe("One targeted question, or empty if none needed."),
 });
 
-const SYSTEM = `You gather requirements for a voice sales agent. Given the current spec and the user's edit request, decide whether the request is underspecified on something that MATTERS — something you cannot reasonably fill with a sensible default.
+const SYSTEM = `You gather requirements for a voice sales agent. Using the full conversation and the current spec, decide whether the LATEST request is underspecified on something that MATTERS — something you cannot reasonably fill with a sensible default.
 
-Ask a clarifying question ONLY when necessary (e.g. "qualify leads" with no criteria given, or "book meetings" with no idea what qualifies). If you can proceed with reasonable defaults, do NOT ask — set needsClarification=false. When you do ask, ask exactly ONE concise, targeted question.`;
+Ask a clarifying question ONLY when necessary (e.g. "qualify leads" with no criteria given). If you can proceed with reasonable defaults, do NOT ask — set needsClarification=false. When you do ask, ask exactly ONE concise, targeted question.
+
+CRITICAL: If earlier in this conversation you already asked a clarifying question and the user has since answered it, do NOT ask again — set needsClarification=false so the edit can proceed with what they told you.`;
 
 export async function clarifierNode(state: BuilderState): Promise<Partial<BuilderState>> {
   const resp = await getAnthropic().messages.parse({
     model: env.builderModel(),
     max_tokens: 400,
-    system: SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: `Current spec:\n${JSON.stringify(state.workingSpec, null, 2)}\n\nEdit request:\n${state.userMessage}`,
-      },
-    ],
+    system: `${SYSTEM}\n\nCurrent spec:\n${JSON.stringify(state.workingSpec, null, 2)}`,
+    messages: historyToMessages(state.history, state.userMessage),
     output_config: { format: zodOutputFormat(ClarifySchema) },
   });
 
