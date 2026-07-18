@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { AgentSpec } from "@/lib/spec/schema";
 import type { SpecDiff } from "@/lib/builder/diff";
+
+interface AgentOption {
+  id: string;
+  name: string;
+  current_version: number;
+}
 
 interface AssistantMeta {
   route?: string | null;
@@ -31,11 +37,38 @@ export default function BuilderPage() {
   const [spec, setSpec] = useState<AgentSpec | null>(null);
   const [compiledPrompt, setCompiledPrompt] = useState<string | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [agents, setAgents] = useState<AgentOption[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const refreshAgents = useCallback(() => {
+    fetch("/api/agents")
+      .then((r) => r.json())
+      .then((d) => setAgents(d.agents ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshAgents();
+  }, [refreshAgents]);
+
+  async function loadAgent(id: string) {
+    const data = await fetch(`/api/agents/${id}`).then((r) => r.json());
+    if (data.error) return;
+    setAgentId(id);
+    setSpec(data.spec ?? null);
+    setCompiledPrompt(data.compiledPrompt ?? null);
+    setShowPrompt(false);
+    setMessages([
+      {
+        role: "assistant",
+        text: `Loaded ${data.agent.name} (v${data.agent.current_version}). Tell me what you'd like to change.`,
+      },
+    ]);
+  }
 
   async function send(text: string) {
     if (!text.trim() || loading) return;
@@ -62,7 +95,10 @@ export default function BuilderPage() {
             meta: { route: data.route, version: data.version, diff: data.diff, testCall: data.testCall },
           },
         ]);
-        if (data.agentId) setAgentId(data.agentId);
+        if (data.agentId) {
+          setAgentId(data.agentId);
+          refreshAgents(); // surface a newly created agent in the picker
+        }
         if (data.spec) setSpec(data.spec);
         if (data.compiledPrompt) setCompiledPrompt(data.compiledPrompt);
       }
@@ -92,14 +128,22 @@ export default function BuilderPage() {
               {agentId ? `Editing agent · v${spec?.version ?? "?"}` : "Describe the agent you want"}
             </p>
           </div>
-          {agentId && (
-            <button
-              onClick={reset}
-              className="text-xs px-2.5 py-1.5 rounded-md border border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/10"
-            >
-              New agent
-            </button>
-          )}
+          <select
+            value={agentId ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) reset();
+              else loadAgent(v);
+            }}
+            className="text-xs rounded-md border border-black/10 dark:border-white/15 bg-transparent px-2 py-1.5"
+          >
+            <option value="">＋ New agent</option>
+            {agents.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} · v{a.current_version}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
