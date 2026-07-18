@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import { initiateCall } from "@/lib/call/initiateCall";
+import { listCalls } from "@/lib/db/repositories/calls";
 import type { CallMode } from "@/lib/db/types";
+
+/** List calls for the dashboard (newest first). */
+export async function GET() {
+  try {
+    return NextResponse.json({ calls: await listCalls() });
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
+}
 
 /**
  * Place a call. The ONE hard confirmation gate: the request must carry

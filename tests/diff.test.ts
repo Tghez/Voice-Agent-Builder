@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { diffSpecs } from "@/lib/builder/diff";
-import { emptySpec } from "@/lib/spec/schema";
+import { emptySpec, type AgentSpec } from "@/lib/spec/schema";
 
 describe("diffSpecs", () => {
   it("reports creation when there is no previous spec", () => {
@@ -20,7 +20,7 @@ describe("diffSpecs", () => {
     const before = emptySpec();
     const after = {
       ...before,
-      actions: ["qualify_lead", "book_meeting"] as const,
+      actions: ["qualify_lead", "book_meeting"] as AgentSpec["actions"],
       qualification: {
         criteria: [{ field: "team_size", op: ">=" as const, value: 10, weight: 1, gate: true }],
         scoring: { mode: "weighted" as const, passScore: 60 },
