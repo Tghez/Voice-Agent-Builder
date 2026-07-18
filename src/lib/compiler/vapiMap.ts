@@ -13,15 +13,16 @@ import { renderPrompt } from "./renderPrompt";
  */
 
 /**
- * Voice → Cartesia voiceId. TODO(provisioning): replace with real Cartesia voice
- * IDs from the Cartesia dashboard before the first live call. Kept in this one
- * file so swapping is a single-place change.
+ * Voice → Cartesia voiceId (real Sonic voice UUIDs from the Cartesia voice
+ * library). Kept in this one file so swapping voices is a single-place change.
+ *   Katie   f786b574-… en-US female   Skylar  db6b0ed5-… en-US female
+ *   Jameson a5136bf9-… en-US male     Greg    a0e99841-… en-US male
  */
 const VOICE_TO_CARTESIA: Record<Voice, string> = {
-  "friendly-female": "cartesia:friendly-female",
-  "friendly-male": "cartesia:friendly-male",
-  "professional-female": "cartesia:professional-female",
-  "professional-male": "cartesia:professional-male",
+  "friendly-female": "f786b574-daa5-4673-aa0c-cbe3e8534c02", // Katie
+  "friendly-male": "a5136bf9-224c-4d76-b823-52bd5efcffcc", // Jameson
+  "professional-female": "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4", // Skylar
+  "professional-male": "a0e99841-438c-4a64-b679-ae501e7d6091", // Greg
 };
 
 type JsonSchema = {
