@@ -12,15 +12,17 @@ import type { BuilderState } from "../state";
  * no LLM). The loop runs until the model emits no more tool calls; the compiler
  * then runs ONCE (graph edge) — never per tool call.
  *
- * Critical: the system prompt requires get_current_spec BEFORE any partial edit,
- * so a change like "make her friendlier" diffs against real state instead of
+ * Critical: the current spec is given to the model directly in the system
+ * prompt (not fetched via a tool round trip — it's already in state), so a
+ * change like "make her friendlier" diffs against real state instead of
  * blind-overwriting fields the user didn't mention.
  */
 
 const SYSTEM = `You edit a voice sales agent's configuration using tools. The config has: identity (name, persona, voice, firstMessage), goal, qualification (criteria + scoring), actions (which runtime tools the agent gets: qualify_lead, check_availability, book_meeting, schedule_callback), and guardrails.
 
+You are given the agent's current spec below. Diff against it: change only what the user asked and preserve everything else. Do not blind-overwrite a section.
+
 Rules:
-- ALWAYS call get_current_spec FIRST before any partial edit, so you change only what the user asked and preserve everything else. Do not blind-overwrite a section.
 - Make surgical edits with the configure_* / set_* tools. Provide only the fields that change (configure_identity merges).
 - If the user wants qualification, use configure_qualification with concrete criteria; mark hard requirements gate:true.
 - If identity.name is currently empty (a brand-new agent), call configure_identity to set a name, persona, and firstMessage suited to the agent's purpose — infer them from context (company/product/role mentioned). Never leave identity.name empty after edits.
@@ -41,11 +43,13 @@ export async function editorNode(state: BuilderState): Promise<Partial<BuilderSt
     state.userMessage,
   );
 
+  const system = `${SYSTEM}\n\nCurrent spec:\n${JSON.stringify(spec, null, 2)}`;
+
   for (let step = 0; step < MAX_STEPS; step++) {
     const resp = await client.messages.create({
       model: env.builderModel(),
       max_tokens: 2048,
-      system: SYSTEM,
+      system,
       tools: BUILDER_TOOLS,
       messages,
     });
@@ -59,14 +63,6 @@ export async function editorNode(state: BuilderState): Promise<Partial<BuilderSt
 
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const tu of toolUses) {
-      if (tu.name === "get_current_spec") {
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: tu.id,
-          content: JSON.stringify(spec),
-        });
-        continue;
-      }
       const r = applyToSpec(spec, { name: tu.name as BuilderToolName, args: tu.input });
       if (r.ok) {
         toolLog.push(`${tu.name} → ${r.section}`);

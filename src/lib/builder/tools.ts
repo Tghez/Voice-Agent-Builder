@@ -2,9 +2,9 @@ import type Anthropic from "@anthropic-ai/sdk";
 
 /**
  * The builder's tool surface (Anthropic tool definitions). The editor node calls
- * these; every mutating call maps 1:1 to applyToSpec. `get_current_spec` is a
- * READ the model must call before any partial edit (enforced in the system
- * prompt) so it diffs against real state instead of blind-overwriting.
+ * these; every mutating call maps 1:1 to applyToSpec. The current spec is given
+ * to the model directly in the editor's system prompt (not via a read tool), so
+ * every tool here is a WRITE.
  */
 
 const VOICE_ENUM = ["friendly-female", "friendly-male", "professional-female", "professional-male"];
@@ -12,12 +12,6 @@ const OP_ENUM = [">=", "<=", "==", "!=", ">", "<", "in", "not_in", "contains", "
 const RUNTIME_TOOLS = ["qualify_lead", "check_availability", "book_meeting", "schedule_callback"];
 
 export const BUILDER_TOOLS: Anthropic.Tool[] = [
-  {
-    name: "get_current_spec",
-    description:
-      "Read the current agent spec. ALWAYS call this before any partial edit so you diff against the real current state instead of overwriting fields the user did not mention.",
-    input_schema: { type: "object", properties: {}, additionalProperties: false },
-  },
   {
     name: "configure_identity",
     description:

@@ -37,10 +37,11 @@ User NL ─▶ BUILDER GRAPH (LangGraph.js, LLM + pure tools) ─▶ AgentSpec (
    context (structured fields + `notes`) is injected PER-CALL by `initiateCall` via
    Vapi's `assistantOverrides.variableValues` — never baked into the compiled
    assistant (that would force recompile+PATCH per lead).
-3. **Editor makes "edit" first-class.** The editor's system prompt requires calling
-   `get_current_spec()` before any partial edit (diff against real state, don't
-   blind-overwrite). The compiler node runs ONCE after the editor tool-loop settles →
-   exactly one Vapi PATCH per turn, never per tool call.
+3. **Editor makes "edit" first-class.** The editor's system prompt is given the
+   current spec directly (from `state.workingSpec`, already in memory — no read
+   round trip) so it diffs against real state instead of blind-overwriting. The
+   compiler node runs ONCE after the editor tool-loop settles → exactly one Vapi
+   PATCH per turn, never per tool call.
 4. **Hybrid scoring — two separate tracks, never merged.**
    - Track 1 **Fit** (`src/lib/scoring/fit.ts`): deterministic, mid-call inside
      `qualify_lead`, NO LLM. Hard gates → weighted score vs `passScore`. Unit-tested.
@@ -71,7 +72,7 @@ lib/
   builder/              LangGraph.js — speaks AgentSpec only
     state.ts            BuilderAnnotation (incl. history: ChatTurn[])
     graph.ts            START→router→{clarifier→editor→compiler→responder | test_runner | responder}
-    tools.ts            configure_* / set_* / get_current_spec (Anthropic tool defs)
+    tools.ts            configure_* / set_* write tools (Anthropic tool defs)
     history.ts          historyToMessages(history, current)
     diff.ts             stable (key-order-insensitive) spec diff
     nodes/*.ts          router, clarifier, editor(pure-tool loop), compiler, responder, testRunner
