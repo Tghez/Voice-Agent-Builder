@@ -2,24 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { AgentSpec } from "@/lib/spec/schema";
-import type { SpecDiff } from "@/lib/builder/diff";
-
-interface AgentOption {
-  id: string;
-  name: string;
-}
-
-interface AssistantMeta {
-  route?: string | null;
-  diff?: SpecDiff | null;
-  testCall?: { note: string } | null;
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  text: string;
-  meta?: AssistantMeta;
-}
+import { Hero } from "@/components/builder/Hero";
+import { Composer } from "@/components/builder/Composer";
+import { MessagesView } from "@/components/builder/MessagesView";
+import { RightRail, type TabId } from "@/components/builder/RightRail";
+import type { AgentOption, ChatMessage } from "@/components/builder/types";
 
 export default function BuilderPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -28,10 +15,19 @@ export default function BuilderPage() {
   const [agentId, setAgentId] = useState<string | null>(null);
   const [spec, setSpec] = useState<AgentSpec | null>(null);
   const [compiledPrompt, setCompiledPrompt] = useState<string | null>(null);
-  const [showPrompt, setShowPrompt] = useState(false);
   const [agents, setAgents] = useState<AgentOption[]>([]);
-  const endRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [railOpen, setRailOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("agents");
+  const started = messages.length > 0;
+
+  /** Force the rail open on the Identity tab so the user can see that a
+   *  create/edit just landed. Stays open until the user clicks the toggle
+   *  button to close it. */
+  function revealIdentity() {
+    setActiveTab("identity");
+    setRailOpen(true);
+  }
+
   // Buffers incoming SSE token text and drains it word-by-word on a fixed
   // cadence, so the UI feels like a steady typewriter even when the network
   // delivers deltas in bursty, multi-word chunks.
@@ -43,21 +39,10 @@ export default function BuilderPage() {
   }>({ pending: "", totalReceived: "", timer: null, onDrain: null });
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  useEffect(() => {
     return () => {
       if (revealRef.current.timer) clearInterval(revealRef.current.timer);
     };
   }, []);
-
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-  }, [input]);
 
   const refreshAgents = useCallback(() => {
     fetch("/api/agents")
@@ -76,7 +61,6 @@ export default function BuilderPage() {
     setAgentId(id);
     setSpec(data.spec ?? null);
     setCompiledPrompt(data.compiledPrompt ?? null);
-    setShowPrompt(false);
     setMessages([
       {
         role: "assistant",
@@ -207,6 +191,10 @@ export default function BuilderPage() {
               }
               if (parsed.spec) setSpec(parsed.spec);
               if (parsed.compiledPrompt) setCompiledPrompt(parsed.compiledPrompt);
+              // diffSpecs() leaves `changes` empty for a brand-new agent (there's
+              // no "before" to diff against) and only populates `summary` — so
+              // check summary, not changes, to catch creation as well as edits.
+              if (parsed.diff?.summary?.some((s: string) => s !== "No changes.")) revealIdentity();
               setLoading(false);
             };
             if (!reveal.pending && !reveal.timer) {
@@ -240,295 +228,32 @@ export default function BuilderPage() {
     setAgentId(null);
     setSpec(null);
     setCompiledPrompt(null);
-    setShowPrompt(false);
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-      {/* Chat */}
-      <section className="flex flex-col rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-white/[0.03] min-h-[70vh]">
-        <div className="flex items-center justify-between border-b border-black/10 dark:border-white/10 px-4 py-3">
-          <div>
-            <h1 className="font-semibold">Builder</h1>
-            <p className="text-xs text-black/50 dark:text-white/50">
-              {agentId ? "Editing agent" : "Describe the agent you want"}
-            </p>
-          </div>
-          <select
-            value={agentId ?? ""}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) reset();
-              else loadAgent(v);
-            }}
-            className="text-xs rounded-md border border-black/10 dark:border-white/15 bg-transparent px-2 py-1.5"
-          >
-            <option value="">＋ New agent</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {messages.map((m, i) => (
-            <Message key={i} m={m} />
-          ))}
-          {loading && messages[messages.length - 1]?.text === "" && (
-            <div className="text-sm text-black/40 dark:text-white/40">Thinking…</div>
-          )}
-          <div ref={endRef} />
-        </div>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            send(input);
-          }}
-          className="border-t border-black/10 dark:border-white/10 p-3 flex gap-2 items-end"
-        >
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send(input);
-              }
-            }}
-            placeholder="Describe or edit the agent…"
-            rows={1}
-            className="flex-1 resize-none rounded-lg border border-black/10 dark:border-white/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:focus:border-white/30 max-h-[200px] overflow-y-auto"
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            aria-label="Send"
-            className="shrink-0 grid place-items-center h-9 w-9 rounded-full bg-black text-white dark:bg-white dark:text-black disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
-            >
-              <path d="M12 19V5" />
-              <path d="M5 12l7-7 7 7" />
-            </svg>
-          </button>
-        </form>
-      </section>
-
-      {/* Spec panel */}
-      <aside className="space-y-4">
-        <SpecCard spec={spec} />
-        {compiledPrompt && (
-          <div className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-white/[0.03]">
-            <button
-              onClick={() => setShowPrompt((v) => !v)}
-              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium"
-            >
-              View compiled prompt
-              <span className="text-black/40 dark:text-white/40">{showPrompt ? "−" : "+"}</span>
-            </button>
-            {showPrompt && (
-              <pre className="border-t border-black/10 dark:border-white/10 px-4 py-3 text-[11px] leading-relaxed font-mono whitespace-pre-wrap overflow-x-auto max-h-[50vh]">
-                {compiledPrompt}
-              </pre>
-            )}
-          </div>
-        )}
-      </aside>
-    </div>
-  );
-}
-
-/** Renders **bold**, __bold__, and `code` spans within a single line of text. */
-function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  const regex = /(\*\*.+?\*\*|__.+?__|`.+?`)/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let i = 0;
-  while ((match = regex.exec(text))) {
-    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-    const token = match[0];
-    if (token.startsWith("`")) {
-      parts.push(
-        <code
-          key={`${keyPrefix}-${i++}`}
-          className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/15 text-[0.9em] font-mono"
-        >
-          {token.slice(1, -1)}
-        </code>,
-      );
-    } else {
-      parts.push(<strong key={`${keyPrefix}-${i++}`}>{token.slice(2, -2)}</strong>);
-    }
-    lastIndex = match.index + token.length;
-  }
-  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-  return parts;
-}
-
-/** Lightweight markdown-lite: paragraphs, `- `/`* ` bullet lists, and inline bold/code. */
-function FormattedText({ text }: { text: string }) {
-  const blocks = text.split(/\n{2,}/);
-  return (
-    <div className="space-y-2">
-      {blocks.map((block, bi) => {
-        const lines = block.split("\n").filter((l) => l.trim() !== "");
-        if (lines.length === 0) return null;
-        const isList = lines.every((l) => /^\s*[-*]\s+/.test(l));
-        if (isList) {
-          return (
-            <ul key={bi} className="list-disc pl-4 space-y-0.5">
-              {lines.map((l, li) => (
-                <li key={li}>{renderInline(l.replace(/^\s*[-*]\s+/, ""), `${bi}-${li}`)}</li>
-              ))}
-            </ul>
-          );
-        }
-        return (
-          <p key={bi}>
-            {lines.map((l, li) => (
-              <span key={li}>
-                {li > 0 && <br />}
-                {renderInline(l, `${bi}-${li}`)}
-              </span>
-            ))}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
-
-function Message({ m }: { m: ChatMessage }) {
-  if (m.role === "user") {
-    return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-black text-white dark:bg-white dark:text-black px-3.5 py-2 text-sm">
-          {m.text}
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="flex justify-start">
-      <div className="max-w-[90%] space-y-2">
-        <div className="rounded-2xl rounded-bl-sm bg-black/[0.04] dark:bg-white/[0.06] px-3.5 py-2 text-sm">
-          <FormattedText text={m.text} />
-        </div>
-        {m.meta?.diff && m.meta.diff.changes.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {m.meta.diff.summary.map((s, i) => (
-              <span
-                key={i}
-                className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-              >
-                {s}
-              </span>
-            ))}
-          </div>
-        )}
-        {m.meta?.testCall && (
-          <a
-            href="/dashboard"
-            className="inline-block text-[12px] px-2.5 py-1 rounded-md border border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/10"
-          >
-            Go to dashboard to place the call →
-          </a>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SpecCard({ spec }: { spec: AgentSpec | null }) {
-  if (!spec) {
-    return (
-      <div className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-white/[0.03] p-4 text-sm text-black/50 dark:text-white/50">
-        No agent yet. Describe one to get started.
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-white/[0.03] p-4 space-y-3 text-sm">
-      <div>
-        <div className="text-[11px] uppercase tracking-wide text-black/40 dark:text-white/40">Identity</div>
-        <div className="font-medium">{spec.identity.name}</div>
-        <div className="text-black/60 dark:text-white/60 text-[13px]">{spec.identity.persona}</div>
-        <div className="text-[12px] text-black/45 dark:text-white/45 mt-1">Voice: {spec.identity.voice}</div>
-      </div>
-      {spec.goal && (
-        <Section label="Goal">
-          <p className="text-[13px] text-black/70 dark:text-white/70">{spec.goal}</p>
-        </Section>
-      )}
-      {spec.qualification.criteria.length > 0 && (
-        <Section label={`Qualification · pass ${spec.qualification.scoring.passScore}`}>
-          <ul className="space-y-1">
-            {spec.qualification.criteria.map((c, i) => (
-              <li key={i} className="text-[13px] text-black/70 dark:text-white/70">
-                <span
-                  className={c.gate ? "text-red-500 mr-1" : "text-yellow-500 mr-1"}
-                  title={c.gate ? "must-have" : "nice-to-have"}
-                >
-                  ●
-                </span>
-                {c.label ?? `${c.field} ${c.op} ${JSON.stringify(c.value)}`}
-              </li>
-            ))}
-          </ul>
-          <div className="flex items-center justify-end gap-3 text-[11px] text-black/45 dark:text-white/45 mt-2">
-            <span>
-              <span className="text-red-500 mr-1">●</span>must-have
-            </span>
-            <span>
-              <span className="text-yellow-500 mr-1">●</span>nice-to-have
-            </span>
-          </div>
-        </Section>
-      )}
-      {spec.actions.length > 0 && (
-        <Section label="Tools">
-          <div className="flex flex-wrap gap-1">
-            {spec.actions.map((a) => (
-              <span key={a} className="text-[11px] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10">
-                {a}
-              </span>
-            ))}
-          </div>
-        </Section>
-      )}
-      {spec.guardrails.length > 0 && (
-        <Section label="Guardrails">
-          <ul className="list-disc pl-4 space-y-0.5">
-            {spec.guardrails.map((g, i) => (
-              <li key={i} className="text-[13px] text-black/70 dark:text-white/70">
-                {g}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-    </div>
-  );
-}
-
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="border-t border-black/[0.06] dark:border-white/[0.08] pt-3">
-      <div className="text-[11px] uppercase tracking-wide text-black/40 dark:text-white/40 mb-1">{label}</div>
-      {children}
-    </div>
+    <>
+      <Hero started={started} panelOpen={railOpen} />
+      <MessagesView started={started} panelOpen={railOpen} messages={messages} loading={loading} />
+      <Composer
+        started={started}
+        panelOpen={railOpen}
+        value={input}
+        onChange={setInput}
+        onSubmit={() => send(input)}
+        loading={loading}
+      />
+      <RightRail
+        agents={agents}
+        agentId={agentId}
+        spec={spec}
+        compiledPrompt={compiledPrompt}
+        onSelectAgent={loadAgent}
+        onNewAgent={reset}
+        open={railOpen}
+        onToggle={() => setRailOpen((v) => !v)}
+        tab={activeTab}
+        onTabChange={setActiveTab}
+      />
+    </>
   );
 }

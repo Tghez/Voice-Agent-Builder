@@ -1,0 +1,41 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { Message } from "./Message";
+import { RAIL_WIDTH } from "./constants";
+import type { ChatMessage } from "./types";
+
+interface MessagesViewProps {
+  started: boolean;
+  panelOpen: boolean;
+  messages: ChatMessage[];
+  loading: boolean;
+}
+
+export function MessagesView({ started, panelOpen, messages, loading }: MessagesViewProps) {
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  return (
+    <div
+      className={
+        "fixed left-0 top-14 bottom-0 overflow-y-auto transition-[right,opacity] duration-[400ms] ease-in-out " +
+        (started ? "opacity-100" : "opacity-0 pointer-events-none")
+      }
+      style={{ right: panelOpen ? RAIL_WIDTH : "0" }}
+    >
+      <div className="mx-auto max-w-3xl px-4 pt-10 pb-40 space-y-4">
+        {messages.map((m, i) => (
+          <Message key={i} m={m} />
+        ))}
+        {loading && messages[messages.length - 1]?.text === "" && (
+          <div className="text-sm text-black/40 dark:text-white/40">Thinking…</div>
+        )}
+        <div ref={endRef} />
+      </div>
+    </div>
+  );
+}
