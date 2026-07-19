@@ -478,15 +478,24 @@ function SpecCard({ spec }: { spec: AgentSpec | null }) {
           <ul className="space-y-1">
             {spec.qualification.criteria.map((c, i) => (
               <li key={i} className="text-[13px] text-black/70 dark:text-white/70">
-                {c.gate && (
-                  <span className="text-red-500 mr-1" title="hard gate">
-                    ●
-                  </span>
-                )}
+                <span
+                  className={c.gate ? "text-red-500 mr-1" : "text-yellow-500 mr-1"}
+                  title={c.gate ? "must-have" : "nice-to-have"}
+                >
+                  ●
+                </span>
                 {c.label ?? `${c.field} ${c.op} ${JSON.stringify(c.value)}`}
               </li>
             ))}
           </ul>
+          <div className="flex items-center justify-end gap-3 text-[11px] text-black/45 dark:text-white/45 mt-2">
+            <span>
+              <span className="text-red-500 mr-1">●</span>must-have
+            </span>
+            <span>
+              <span className="text-yellow-500 mr-1">●</span>nice-to-have
+            </span>
+          </div>
         </Section>
       )}
       {spec.actions.length > 0 && (
