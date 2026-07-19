@@ -32,10 +32,25 @@ export default function BuilderPage() {
   const [agents, setAgents] = useState<AgentOption[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Buffers incoming SSE token text and drains it word-by-word on a fixed
+  // cadence, so the UI feels like a steady typewriter even when the network
+  // delivers deltas in bursty, multi-word chunks.
+  const revealRef = useRef<{
+    pending: string;
+    totalReceived: string;
+    timer: ReturnType<typeof setInterval> | null;
+    onDrain: (() => void) | null;
+  }>({ pending: "", totalReceived: "", timer: null, onDrain: null });
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (revealRef.current.timer) clearInterval(revealRef.current.timer);
+    };
+  }, []);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -79,6 +94,43 @@ export default function BuilderPage() {
     });
   }
 
+  function appendToLastMessage(chunk: string) {
+    setMessages((m) => {
+      if (m.length === 0) return m;
+      const next = [...m];
+      const last = next[next.length - 1];
+      next[next.length - 1] = { ...last, text: last.text + chunk };
+      return next;
+    });
+  }
+
+  /** Drains `reveal.pending` a word at a time on a fixed cadence (speeding up
+   *  if a big backlog has built up), so bursty network chunks still read as
+   *  a smooth typewriter. Calls `onDrain` once fully caught up. */
+  function startReveal(reveal: typeof revealRef.current) {
+    if (reveal.timer) return;
+    reveal.timer = setInterval(() => {
+      const wordsPerTick = reveal.pending.length > 400 ? 3 : reveal.pending.length > 150 ? 2 : 1;
+      let chunk = "";
+      for (let i = 0; i < wordsPerTick; i++) {
+        const match = reveal.pending.match(/^\s*\S+/);
+        if (!match) break;
+        chunk += match[0];
+        reveal.pending = reveal.pending.slice(match[0].length);
+      }
+      if (chunk) appendToLastMessage(chunk);
+      if (!reveal.pending) {
+        if (reveal.timer) {
+          clearInterval(reveal.timer);
+          reveal.timer = null;
+        }
+        const onDrain = reveal.onDrain;
+        reveal.onDrain = null;
+        onDrain?.();
+      }
+    }, 22);
+  }
+
   async function send(text: string) {
     if (!text.trim() || loading) return;
     // Prior turns of this session (before adding the current one) = the history.
@@ -86,6 +138,20 @@ export default function BuilderPage() {
     setMessages((m) => [...m, { role: "user", text }, { role: "assistant", text: "" }]);
     setInput("");
     setLoading(true);
+
+    const reveal = revealRef.current;
+    if (reveal.timer) clearInterval(reveal.timer);
+    reveal.pending = "";
+    reveal.totalReceived = "";
+    reveal.timer = null;
+    reveal.onDrain = null;
+
+    function pushToken(chunk: string) {
+      reveal.totalReceived += chunk;
+      reveal.pending += chunk;
+      startReveal(reveal);
+    }
+
     try {
       const res = await fetch("/api/builder", {
         method: "POST",
@@ -95,13 +161,13 @@ export default function BuilderPage() {
       if (!res.body) {
         const data = await res.json().catch(() => ({}));
         updateLastMessage({ text: `Error: ${data.error || res.statusText}` });
+        setLoading(false);
         return;
       }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let accumulated = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -121,27 +187,50 @@ export default function BuilderPage() {
           const parsed = JSON.parse(dataLine);
 
           if (event === "token") {
-            accumulated += parsed.text ?? "";
-            updateLastMessage({ text: accumulated });
+            pushToken(parsed.text ?? "");
           } else if (event === "done") {
-            updateLastMessage({
-              text: parsed.reply || accumulated || "(no reply)",
-              meta: { route: parsed.route, diff: parsed.diff, testCall: parsed.testCall },
-            });
-            if (parsed.agentId) {
-              setAgentId(parsed.agentId);
-              refreshAgents(); // surface a newly created agent in the picker
+            // Reconcile against the authoritative final reply in case it
+            // diverges from the summed deltas (e.g. a trimmed fallback).
+            const leftover =
+              typeof parsed.reply === "string" && parsed.reply.length > reveal.totalReceived.length
+                ? parsed.reply.slice(reveal.totalReceived.length)
+                : "";
+            if (leftover) pushToken(leftover);
+
+            reveal.onDrain = () => {
+              updateLastMessage({
+                meta: { route: parsed.route, diff: parsed.diff, testCall: parsed.testCall },
+              });
+              if (parsed.agentId) {
+                setAgentId(parsed.agentId);
+                refreshAgents(); // surface a newly created agent in the picker
+              }
+              if (parsed.spec) setSpec(parsed.spec);
+              if (parsed.compiledPrompt) setCompiledPrompt(parsed.compiledPrompt);
+              setLoading(false);
+            };
+            if (!reveal.pending && !reveal.timer) {
+              const onDrain = reveal.onDrain;
+              reveal.onDrain = null;
+              onDrain?.();
             }
-            if (parsed.spec) setSpec(parsed.spec);
-            if (parsed.compiledPrompt) setCompiledPrompt(parsed.compiledPrompt);
           } else if (event === "error") {
+            if (reveal.timer) {
+              clearInterval(reveal.timer);
+              reveal.timer = null;
+            }
+            reveal.pending = "";
             updateLastMessage({ text: `Error: ${parsed.error}` });
+            setLoading(false);
           }
         }
       }
     } catch (e) {
+      if (reveal.timer) {
+        clearInterval(reveal.timer);
+        reveal.timer = null;
+      }
       updateLastMessage({ text: `Error: ${(e as Error).message}` });
-    } finally {
       setLoading(false);
     }
   }
