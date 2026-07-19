@@ -39,6 +39,7 @@ export async function POST(req: Request) {
     callRowId: meta.callRowId,
     agentId: meta.agentId,
     assistantId: call.assistantId ?? message.assistant?.id,
+    vapiCallId: call.id,
   };
 
   const toolCalls: VapiToolCall[] = message.toolCallList ?? [];

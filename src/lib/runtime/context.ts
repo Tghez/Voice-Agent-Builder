@@ -4,7 +4,7 @@ import {
   getAgentByAssistantId,
   getCurrentSpec,
 } from "@/lib/db/repositories/agents";
-import { mergeOutcome } from "@/lib/db/repositories/calls";
+import { getOrCreateCallRow, mergeOutcome } from "@/lib/db/repositories/calls";
 import type { Qualification } from "@/lib/spec/schema";
 import type { ToolSession } from "./handlers";
 
@@ -13,6 +13,7 @@ export interface WebhookToolContext {
   callRowId?: string; // our calls.id (set via call metadata)
   agentId?: string; // our agents.id (set via call metadata)
   assistantId?: string; // fallback lookup key
+  vapiCallId?: string; // Vapi's own call id — lazy-row fallback when callRowId is absent
 }
 
 const EMPTY_QUALIFICATION: Qualification = {
@@ -30,11 +31,16 @@ export async function buildToolSession(ctx: WebhookToolContext): Promise<ToolSes
   if (!agent && ctx.assistantId) agent = await getAgentByAssistantId(ctx.assistantId);
   const spec = agent ? await getCurrentSpec(agent) : null;
 
+  let callRowId = ctx.callRowId ?? null;
+  if (!callRowId && ctx.vapiCallId && agent) {
+    callRowId = (await getOrCreateCallRow(ctx.vapiCallId, agent.id)).id;
+  }
+
   return {
     qualification: spec?.qualification ?? EMPTY_QUALIFICATION,
     calendar: getCalendar(),
     persistOutcome: async (patch) => {
-      if (ctx.callRowId) await mergeOutcome(ctx.callRowId, patch);
+      if (callRowId) await mergeOutcome(callRowId, patch);
     },
   };
 }

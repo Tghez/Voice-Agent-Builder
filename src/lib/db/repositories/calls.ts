@@ -55,6 +55,33 @@ export async function findByVapiCallId(vapiCallId: string): Promise<CallRow | nu
   return data;
 }
 
+/**
+ * Find the row for a Vapi call id, or lazily create one. Calls placed outside
+ * our own /api/calls flow (e.g. Vapi's browser test widget) carry no
+ * callRowId metadata, so the webhook handlers fall back to this — the row
+ * still shows up on the dashboard, just with no known lead.
+ */
+export async function getOrCreateCallRow(vapiCallId: string, agentId: string): Promise<CallRow> {
+  const existing = await findByVapiCallId(vapiCallId);
+  if (existing) return existing;
+
+  const db = serviceClient();
+  const { data, error } = await db
+    .from("calls")
+    .insert({
+      agent_id: agentId,
+      lead_id: null,
+      mode: "test",
+      vapi_call_id: vapiCallId,
+      status: "in-progress",
+      structured_outcome: {},
+    })
+    .select()
+    .single<CallRow>();
+  if (error) throw error;
+  return data;
+}
+
 /** Shallow-merge a partial outcome into structured_outcome (read-then-write). */
 export async function mergeOutcome(
   callId: string,

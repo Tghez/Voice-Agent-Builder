@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import {
   applyEndOfCall,
   findByVapiCallId,
+  getOrCreateCallRow,
   mergeOutcome,
 } from "@/lib/db/repositories/calls";
+import { getAgentByAssistantId } from "@/lib/db/repositories/agents";
 import { getCRM } from "@/lib/providers/crm";
 import { scoreIntent } from "@/lib/scoring/intent";
 
@@ -43,13 +45,22 @@ export async function POST(req: Request) {
   const meta = call.metadata ?? {};
   const artifact = message.artifact ?? {};
 
-  // 1) Correlate to our call row (metadata first, else by Vapi call id).
+  // 1) Correlate to our call row (metadata first, else by Vapi call id, else
+  //    lazily create one — a call placed outside our /api/calls flow, e.g.
+  //    Vapi's browser test widget, may never have hit the tools webhook at
+  //    all if the model made no tool calls).
   let callRowId: string | null = meta.callRowId ?? null;
   let leadId: string | null = meta.leadId ?? null;
   if (!callRowId && call.id) {
     const row = await findByVapiCallId(call.id);
-    callRowId = row?.id ?? null;
-    leadId = leadId ?? row?.lead_id ?? null;
+    if (row) {
+      callRowId = row.id;
+      leadId = leadId ?? row.lead_id ?? null;
+    } else {
+      const assistantId = call.assistantId ?? message.assistant?.id;
+      const agent = assistantId ? await getAgentByAssistantId(assistantId) : null;
+      if (agent) callRowId = (await getOrCreateCallRow(call.id, agent.id)).id;
+    }
   }
   if (!callRowId) {
     return NextResponse.json({ ok: true, note: "no matching call row" });

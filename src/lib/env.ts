@@ -32,6 +32,8 @@ export const env = {
   // Vapi
   vapiKey: (): string => required("VAPI_API_KEY"),
   vapiPhoneNumberId: (): string => required("VAPI_PHONE_NUMBER_ID"),
+  /** Client-side key for the Vapi Web SDK (browser calls) — safe to expose. */
+  vapiPublicKey: (): string => required("NEXT_PUBLIC_VAPI_PUBLIC_KEY"),
 
   // Supabase
   supabaseUrl: (): string => required("NEXT_PUBLIC_SUPABASE_URL"),
