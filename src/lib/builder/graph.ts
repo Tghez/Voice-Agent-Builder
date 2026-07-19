@@ -10,19 +10,26 @@ import { testRunnerNode } from "./nodes/testRunner";
 /**
  * The builder graph (6 nodes):
  *
- *   START → router ─┬─ edit ──────→ clarifier ─┬─ (asks Q) → END
- *                   │                           └─ (proceed) → editor → compiler → responder → END
- *                   ├─ test_call ─→ test_runner → END
- *                   └─ question/chitchat → responder → END
+ *   START → router ─┬─ edit, needs clarification → clarifier ──────────────────→ responder → END
+ *                   ├─ edit, clear ───────────────────────────────────→ editor ─┬─ changed → compiler ─┐
+ *                   │                                                           └─ no-op ───────────────┼→ responder → END
+ *                   ├─ test_call ────────────────────────────────────→ test_runner ──────────────────────┘
+ *                   └─ question/chitchat ──────────────────────────────────────────────────────────────→ responder → END
  *
- * Router and editor are separate nodes. The compiler runs ONCE after the editor
- * loop settles. Inline clarifier ends the turn (no checkpointer).
+ * Router's own LLM call also decides needsClarification (single source of
+ * truth — clarifier doesn't re-decide, it only formulates the question), so
+ * the clarifier is entered only when a turn is actually underspecified, not
+ * as a mandatory gate on every edit. The compiler runs ONCE after the editor
+ * loop settles, and only when a tool call actually mutated the spec (skip it
+ * on no-op turns so we don't create phantom spec writes / pointless Vapi
+ * PATCHes). All user-facing replies funnel through responder, which phrases
+ * each case. Inline clarifier ends the turn (no checkpointer).
  */
 
-function fromRouter(s: BuilderState): "clarifier" | "test_runner" | "responder" {
+function fromRouter(s: BuilderState): "editor" | "clarifier" | "test_runner" | "responder" {
   switch (s.route) {
     case "edit":
-      return "clarifier";
+      return s.needsClarification ? "clarifier" : "editor";
     case "test_call":
       return "test_runner";
     default:
@@ -39,17 +46,18 @@ const workflow = new StateGraph(BuilderAnnotation)
   .addNode("test_runner", testRunnerNode)
   .addEdge(START, "router")
   .addConditionalEdges("router", fromRouter, {
+    editor: "editor",
     clarifier: "clarifier",
     test_runner: "test_runner",
     responder: "responder",
   })
-  .addConditionalEdges("clarifier", (s: BuilderState) => (s.done ? "end" : "editor"), {
-    editor: "editor",
-    end: END,
+  .addEdge("clarifier", "responder")
+  .addConditionalEdges("editor", (s: BuilderState) => (s.changed ? "compiler" : "responder"), {
+    compiler: "compiler",
+    responder: "responder",
   })
-  .addEdge("editor", "compiler")
   .addEdge("compiler", "responder")
-  .addEdge("responder", END)
-  .addEdge("test_runner", END);
+  .addEdge("test_runner", "responder")
+  .addEdge("responder", END);
 
 export const builderGraph = workflow.compile();

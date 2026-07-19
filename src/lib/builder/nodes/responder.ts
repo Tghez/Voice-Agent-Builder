@@ -5,15 +5,31 @@ import { historyToMessages } from "../history";
 import type { BuilderState } from "../state";
 
 /**
- * responder — plain-language turn. For edits, summarizes the diff and points to
- * the compiled-prompt view + test call. For questions/chitchat, answers using
- * the spec as context. Streams its reply token-by-token via the graph's custom
- * stream channel (consumed by the API route as SSE).
+ * responder — the single place every user-facing reply is produced and
+ * streamed. Branches on state to phrase each case: a clarifier question
+ * (text already decided by clarifierNode, just relayed here), a test-call
+ * readiness message, an edit summary, or a free-form question/chitchat
+ * answer. Streams token-by-token via the graph's custom stream channel
+ * (consumed by the API route as SSE).
  */
 export async function responderNode(state: BuilderState): Promise<Partial<BuilderState>> {
   // Captured synchronously so it works from inside the stream's "text" event
   // callback, which runs outside the AsyncLocalStorage context getWriter() relies on.
   const write = getWriter();
+
+  // clarifier decided this turn needs a question — relay it, don't regenerate.
+  if (state.route === "edit" && state.done) {
+    const reply = state.reply ?? "Could you clarify what you'd like changed?";
+    write?.(reply);
+    return { reply, done: true };
+  }
+
+  if (state.route === "test_call") {
+    const reply =
+      "Ready to place a test call with this agent. Pick a lead and confirm — I'll dial your demo number (~$0.13/min, a real call).";
+    write?.(reply);
+    return { reply, done: true };
+  }
 
   if (state.route === "edit") {
     const lines = state.diff?.summary ?? ["Updated."];

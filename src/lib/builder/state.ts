@@ -25,6 +25,10 @@ export const BuilderAnnotation = Annotation.Root({
 
   // Routing
   route: Annotation<Route | undefined>(),
+  /** route=edit only: is the request underspecified on something that matters? */
+  needsClarification: Annotation<boolean | undefined>(),
+  /** Router's rationale for the classification; when needsClarification, names the gap for the clarifier. */
+  routeReason: Annotation<string | undefined>(),
 
   // Editor output
   toolLog: Annotation<string[]>(),
