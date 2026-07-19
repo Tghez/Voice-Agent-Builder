@@ -20,7 +20,7 @@ export function Hero({ started, panelOpen }: { started: boolean; panelOpen: bool
         What voice agent should we build today?
       </h1>
       <p className="mt-3 text-sm text-black/50 dark:text-white/50">
-        Describe the agent you want — who it is, what it qualifies, what it should do.
+        Think of the agent you want — who it is, what it qualifies, what it should do.
       </p>
     </div>
   );
