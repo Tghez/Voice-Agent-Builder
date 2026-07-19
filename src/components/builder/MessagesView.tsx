@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Message } from "./Message";
+import { ThinkingIndicator } from "./ThinkingIndicator";
 import { RAIL_WIDTH } from "./constants";
 import type { ChatMessage } from "./types";
 
@@ -28,12 +29,13 @@ export function MessagesView({ started, panelOpen, messages, loading }: Messages
       style={{ right: panelOpen ? RAIL_WIDTH : "0" }}
     >
       <div className="mx-auto max-w-3xl px-4 pt-10 pb-40 space-y-4">
-        {messages.map((m, i) => (
-          <Message key={i} m={m} />
-        ))}
-        {loading && messages[messages.length - 1]?.text === "" && (
-          <div className="text-sm text-black/40 dark:text-white/40">Thinking…</div>
-        )}
+        {messages.map((m, i) => {
+          const isPendingPlaceholder =
+            loading && i === messages.length - 1 && m.role === "assistant" && m.text === "";
+          if (isPendingPlaceholder) return null;
+          return <Message key={i} m={m} />;
+        })}
+        {loading && messages[messages.length - 1]?.text === "" && <ThinkingIndicator />}
         <div ref={endRef} />
       </div>
     </div>

@@ -5,7 +5,7 @@ export function Message({ m }: { m: ChatMessage }) {
   if (m.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-black text-white dark:bg-white dark:text-black px-3.5 py-2 text-sm">
+        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-black/[0.04] dark:bg-white/[0.06] px-3.5 py-2 text-sm">
           {m.text}
         </div>
       </div>
@@ -14,7 +14,7 @@ export function Message({ m }: { m: ChatMessage }) {
   return (
     <div className="flex justify-start">
       <div className="max-w-[90%] space-y-2">
-        <div className="rounded-2xl rounded-bl-sm bg-black/[0.04] dark:bg-white/[0.06] px-3.5 py-2 text-sm">
+        <div className="px-3.5 py-2 text-sm">
           <FormattedText text={m.text} />
         </div>
         {m.meta?.diff && m.meta.diff.summary.some((s) => s !== "No changes.") && (
