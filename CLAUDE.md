@@ -10,11 +10,11 @@ qualifies them, and books meetings. (Alta AI-Engineer take-home.)
 
 ## The one idea: spec-as-contract
 
-Two agents never talk directly. They're joined by one canonical, versioned
+Two agents never talk directly. They're joined by one canonical
 artifact — the **AgentSpec** (`src/lib/spec/schema.ts`).
 
 ```
-User NL ─▶ BUILDER GRAPH (LangGraph.js, LLM + pure tools) ─▶ AgentSpec (canonical, versioned in DB)
+User NL ─▶ BUILDER GRAPH (LangGraph.js, LLM + pure tools) ─▶ AgentSpec (canonical, stored in DB)
                                                                  │
                                                                  ▼  compile() + Zod validate (deterministic, NO LLM)
                                                            Vapi Assistant (live config)
@@ -32,10 +32,11 @@ User NL ─▶ BUILDER GRAPH (LangGraph.js, LLM + pure tools) ─▶ AgentSpec (
    else speaks AgentSpec. If a Vapi type/field name appears outside `lib/compiler/`,
    stop and refactor. Swapping to Retell must touch only that dir.
 2. **Compile-once / lead-per-call.** `renderPrompt(spec)` is lead-agnostic and emits
-   a `{{leadContext}}` placeholder. One Vapi assistant is compiled per spec *version*
-   and reused across every lead. Lead context (structured fields + `notes`) is injected
-   PER-CALL by `initiateCall` via Vapi's `assistantOverrides.variableValues` — never
-   baked into the compiled assistant (that would force recompile+PATCH per lead).
+   a `{{leadContext}}` placeholder. One Vapi assistant is compiled per agent (PATCHed
+   in place on every edit — no version history) and reused across every lead. Lead
+   context (structured fields + `notes`) is injected PER-CALL by `initiateCall` via
+   Vapi's `assistantOverrides.variableValues` — never baked into the compiled
+   assistant (that would force recompile+PATCH per lead).
 3. **Editor makes "edit" first-class.** The editor's system prompt requires calling
    `get_current_spec()` before any partial edit (diff against real state, don't
    blind-overwrite). The compiler node runs ONCE after the editor tool-loop settles →
@@ -95,7 +96,7 @@ lib/
 app/
   page.tsx              Builder chat (diff chips, view-compiled-prompt, live spec panel, sends history)
   dashboard/page.tsx    leads (CRM look) + confirm-gated Call + calls view + aggregates
-  evals/page.tsx        run harness + per-case pass/fail tied to spec_version
+  evals/page.tsx        run harness + per-case pass/fail
   api/builder/route.ts  one chat turn → graph.stream() as SSE (loads spec by agentId, accepts history)
   api/calls/route.ts    POST place call (requires confirm:true, 428 otherwise) + GET list
   api/vapi/tools/route.ts   runtime tool webhook (message.toolCallList → {results})
@@ -107,14 +108,17 @@ components/Nav.tsx       top nav
 
 ## Data model (Supabase; `supabase/migrations/`)
 
-`leads` (10 seeded; every `phone` forced to `DEMO_PHONE`) · `agents` (points at
-current_version + vapi_assistant_id) · `agent_specs` (versioned jsonb, unique(agent_id,version))
+`leads` (10 seeded; every `phone` forced to `DEMO_PHONE`) · `agents` (id, name,
+`spec` jsonb — the one live spec, overwritten in place on every edit — + vapi_assistant_id)
 · `calls` (mode test|live, transcript, recording_url, duration_sec, cost_usd,
 `structured_outcome` jsonb = `{fit, intent, extracted, meeting_booked, callback_scheduled}`)
 · `eval_runs` / `eval_cases`.
 
 - `0001_init.sql` = schema. `0002_grants.sql` = table grants (Supabase default grants
-  can be missing → symptom "42501 permission denied"). Run both in the SQL editor.
+  can be missing → symptom "42501 permission denied"). `0003_remove_agent_versioning.sql`
+  = dropped the old `agent_specs` version history + `agents.current_version` +
+  `eval_runs.spec_version` in favor of a single `agents.spec` column. Run all in the
+  SQL editor, in order.
 
 ## Models & env (`src/lib/env.ts` is the ONLY place to read env)
 
@@ -148,7 +152,7 @@ current_version + vapi_assistant_id) · `agent_specs` (versioned jsonb, unique(a
   inside a later callback (e.g. an Anthropic `stream.on("text", ...)` handler) can miss
   the AsyncLocalStorage context. The API route interleaves `"token"` SSE events (custom
   chunks) with a final `"done"` event carrying the last `"values"` snapshot (route, diff,
-  version, compiledPrompt, spec, agentId). `src/app/page.tsx` reads the fetch body as a
+  compiledPrompt, spec, agentId). `src/app/page.tsx` reads the fetch body as a
   stream and parses `event:`/`data:` blocks by hand (no `EventSource`, since that only
   supports GET).
 
@@ -166,7 +170,7 @@ current_version + vapi_assistant_id) · `agent_specs` (versioned jsonb, unique(a
 
 ## Provisioning state (as of this writing)
 
-- Supabase: provisioned, both migrations run, 10 leads seeded. ✅
+- Supabase: provisioned, all migrations run, 10 leads seeded. ✅
 - Vapi: number bought in Vapi (not a separate Twilio account), `VAPI_PHONE_NUMBER_ID` set. ✅
 - Anthropic key set; spend caps set in BOTH Vapi and Anthropic consoles. ✅
 - `DEMO_PHONE` set (a real number; every lead routes there — never dials a prospect). ✅

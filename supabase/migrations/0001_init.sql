@@ -16,25 +16,13 @@ create table if not exists leads (
   created_at  timestamptz not null default now()
 );
 
--- ── Agents: points at the live spec version. ──
+-- ── Agents: one live spec per agent, updated in place on every edit. ──
 create table if not exists agents (
   id                uuid primary key default gen_random_uuid(),
   name              text not null,
-  current_version   int  not null default 0,
-  vapi_assistant_id text,
-  created_at        timestamptz not null default now()
-);
-
--- ── Agent specs: versioned. Every version stored (history + rollback + tie eval
---    results to a version). ──
-create table if not exists agent_specs (
-  id                uuid primary key default gen_random_uuid(),
-  agent_id          uuid not null references agents(id) on delete cascade,
-  version           int  not null,
   spec              jsonb not null,
   vapi_assistant_id text,
-  created_at        timestamptz not null default now(),
-  unique (agent_id, version)
+  created_at        timestamptz not null default now()
 );
 
 -- ── Calls: test + live. structured_outcome holds BOTH scoring tracks. ──
@@ -63,7 +51,6 @@ create index if not exists calls_mode_idx  on calls(mode);
 create table if not exists eval_runs (
   id           uuid primary key default gen_random_uuid(),
   agent_id     uuid references agents(id) on delete set null,
-  spec_version int,
   summary      jsonb,
   created_at   timestamptz not null default now()
 );

@@ -1,6 +1,6 @@
 /**
  * Day-1 milestone: a hand-written AgentSpec compiles to a REAL Vapi assistant
- * and is persisted as agent + agent_specs(version 1).
+ * and is persisted as an agent.
  *
  * Run: npm run assistant:create
  */
@@ -34,7 +34,6 @@ function sampleSpec(): AgentSpec {
       "Never promise anything you cannot confirm.",
       "Keep responses short and natural — this is a phone call.",
     ],
-    version: 1,
   });
 }
 

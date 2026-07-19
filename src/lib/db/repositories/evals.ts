@@ -11,20 +11,18 @@ export interface EvalCaseInput {
 export interface EvalRunRow {
   id: string;
   agent_id: string | null;
-  spec_version: number | null;
   summary: Record<string, unknown> | null;
   created_at: string;
 }
 
 export async function insertRun(
   agentId: string,
-  specVersion: number,
   summary: Record<string, unknown>,
 ): Promise<string> {
   const db = serviceClient();
   const { data, error } = await db
     .from("eval_runs")
-    .insert({ agent_id: agentId, spec_version: specVersion, summary })
+    .insert({ agent_id: agentId, summary })
     .select()
     .single<{ id: string }>();
   if (error) throw error;

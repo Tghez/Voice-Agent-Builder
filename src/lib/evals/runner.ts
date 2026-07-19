@@ -19,7 +19,7 @@ import { insertRun, insertCases, type EvalCaseInput } from "@/lib/db/repositorie
  * runtime tools (executed for real via a ToolSession). Ground-truth
  * qualification comes from scoreFit on the persona's true attributes, so we can
  * check the agent's verdict deterministically; an LLM judge checks guardrails.
- * No telephony, cheap, many cases — tied to spec_version.
+ * No telephony, cheap, many cases.
  */
 
 type Turn = { role: "agent" | "lead"; text: string };
@@ -201,7 +201,6 @@ export async function evaluateCase(spec: AgentSpec, persona: Persona): Promise<C
 
 export interface EvalSummary {
   runId: string;
-  specVersion: number;
   total: number;
   passed: number;
   qualifyRate: number; // % of cases where the agent's qualify verdict matched ground truth
@@ -215,7 +214,6 @@ export async function runEval(agentId: string): Promise<EvalSummary> {
   if (!agent) throw new Error(`agent ${agentId} not found`);
   const spec = await getCurrentSpec(agent);
   if (!spec) throw new Error(`no current spec for agent ${agentId}`);
-  const specVersion = agent.current_version;
 
   // Run personas sequentially (keeps token bursts modest and ordering stable).
   const results: CaseResult[] = [];
@@ -230,7 +228,6 @@ export async function runEval(agentId: string): Promise<EvalSummary> {
   const guardrailViolations = results.filter((r) => r.scores.guardrails_ok === false).length;
 
   const summary: Omit<EvalSummary, "runId"> = {
-    specVersion,
     total: results.length,
     passed,
     qualifyRate: Math.round((qualifyCorrect / results.length) * 100),
@@ -241,7 +238,7 @@ export async function runEval(agentId: string): Promise<EvalSummary> {
     cases: results.map((r) => ({ id: r.id, passed: r.passed, notes: r.judge_notes })),
   };
 
-  const runId = await insertRun(agentId, specVersion, summary as unknown as Record<string, unknown>);
+  const runId = await insertRun(agentId, summary as unknown as Record<string, unknown>);
   await insertCases(
     runId,
     results.map(({ persona, transcript, scores, passed, judge_notes }) => ({

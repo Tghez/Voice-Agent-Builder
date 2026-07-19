@@ -2,7 +2,7 @@
  * End-to-end smoke test of the builder graph (real Anthropic + Vapi + Supabase):
  *   1. create an agent from NL,
  *   2. edit it ("more energetic") and confirm the change is SURGICAL (persona
- *      only) and PATCHes the same assistant at a new version.
+ *      only) and PATCHes the same assistant in place.
  *
  * Run: npm run builder:smoke
  */
@@ -24,7 +24,7 @@ async function turn(message: string, agentId?: string) {
 
   const r = await builderGraph.invoke({ userMessage: message, agentId, workingSpec, prevSpec });
   console.log(`\n> ${message}`);
-  console.log(`  route=${r.route}  version=${r.version ?? "-"}  agentId=${r.agentId ?? "-"}`);
+  console.log(`  route=${r.route}  agentId=${r.agentId ?? "-"}`);
   if (r.toolLog?.length) console.log(`  edits: ${r.toolLog.join(", ")}`);
   if (r.diff) console.log(`  diff: ${r.diff.summary.join(" ")}`);
   console.log(`  reply: ${r.reply}`);

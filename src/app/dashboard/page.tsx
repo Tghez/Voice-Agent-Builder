@@ -75,7 +75,7 @@ export default function DashboardPage() {
             {agents.length === 0 && <option value="">No agents yet</option>}
             {agents.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.name} · v{a.current_version}
+                {a.name}
               </option>
             ))}
           </select>

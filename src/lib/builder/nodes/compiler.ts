@@ -1,13 +1,13 @@
 import { RealVapiClient } from "@/lib/compiler/vapiClient";
 import { syncSpecToVapi } from "@/lib/compiler/compile";
-import { addSpecVersion, createAgentWithSpec, getAgent } from "@/lib/db/repositories/agents";
+import { createAgentWithSpec, getAgent, updateAgentSpec } from "@/lib/db/repositories/agents";
 import { env } from "@/lib/env";
 import { diffSpecs } from "../diff";
 import type { BuilderState } from "../state";
 
 /**
  * compiler node — runs ONCE after the editor loop settles (never per tool call).
- * Deterministic: validate → build → PATCH/POST → persist a new spec version.
+ * Deterministic: validate → build → PATCH/POST → persist the spec in place.
  * Skips the Vapi write when nothing changed.
  */
 export async function compilerNode(state: BuilderState): Promise<Partial<BuilderState>> {
@@ -32,22 +32,20 @@ export async function compilerNode(state: BuilderState): Promise<Partial<Builder
   const compiledPrompt = vapiObject.model.messages[0].content;
 
   if (state.agentId) {
-    const version = await addSpecVersion(state.agentId, synced, assistantId);
+    await updateAgentSpec(state.agentId, synced, assistantId);
     return {
       assistantId,
-      version,
-      workingSpec: { ...synced, version },
+      workingSpec: synced,
       compiledPrompt,
       diff: diffSpecs(state.prevSpec, synced),
     };
   }
 
-  const created = await createAgentWithSpec({ ...synced, version: 1 }, assistantId);
+  const created = await createAgentWithSpec(synced, assistantId);
   return {
     agentId: created.agentId,
     assistantId,
-    version: created.version,
-    workingSpec: { ...synced, version: created.version },
+    workingSpec: synced,
     compiledPrompt,
     diff: diffSpecs(state.prevSpec, synced),
   };

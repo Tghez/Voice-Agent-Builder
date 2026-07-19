@@ -20,7 +20,7 @@ async function main() {
     return;
   }
   console.log(
-    `Agent "${agent.name}" v${agent.current_version} · actions=[${spec.actions.join(", ")}] · criteria=[${spec.qualification.criteria
+    `Agent "${agent.name}" · actions=[${spec.actions.join(", ")}] · criteria=[${spec.qualification.criteria
       .map((c) => `${c.field}${c.gate ? "(gate)" : ""}`)
       .join(", ")}] · pass=${spec.qualification.scoring.passScore}`,
   );

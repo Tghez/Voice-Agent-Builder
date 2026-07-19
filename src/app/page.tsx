@@ -7,12 +7,10 @@ import type { SpecDiff } from "@/lib/builder/diff";
 interface AgentOption {
   id: string;
   name: string;
-  current_version: number;
 }
 
 interface AssistantMeta {
   route?: string | null;
-  version?: number | null;
   diff?: SpecDiff | null;
   testCall?: { note: string } | null;
 }
@@ -67,7 +65,7 @@ export default function BuilderPage() {
     setMessages([
       {
         role: "assistant",
-        text: `Loaded ${data.agent.name} (v${data.agent.current_version}). Tell me what you'd like to change.`,
+        text: `Loaded ${data.agent.name}. Tell me what you'd like to change.`,
       },
     ]);
   }
@@ -128,7 +126,7 @@ export default function BuilderPage() {
           } else if (event === "done") {
             updateLastMessage({
               text: parsed.reply || accumulated || "(no reply)",
-              meta: { route: parsed.route, version: parsed.version, diff: parsed.diff, testCall: parsed.testCall },
+              meta: { route: parsed.route, diff: parsed.diff, testCall: parsed.testCall },
             });
             if (parsed.agentId) {
               setAgentId(parsed.agentId);
@@ -164,7 +162,7 @@ export default function BuilderPage() {
           <div>
             <h1 className="font-semibold">Builder</h1>
             <p className="text-xs text-black/50 dark:text-white/50">
-              {agentId ? `Editing agent · v${spec?.version ?? "?"}` : "Describe the agent you want"}
+              {agentId ? "Editing agent" : "Describe the agent you want"}
             </p>
           </div>
           <select
@@ -179,7 +177,7 @@ export default function BuilderPage() {
             <option value="">＋ New agent</option>
             {agents.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.name} · v{a.current_version}
+                {a.name}
               </option>
             ))}
           </select>

@@ -17,9 +17,8 @@ export async function responderNode(state: BuilderState): Promise<Partial<Builde
 
   if (state.route === "edit") {
     const lines = state.diff?.summary ?? ["Updated."];
-    const vtxt = state.version ? ` (v${state.version})` : "";
     const reply = state.changed
-      ? `Done${vtxt} — ${lines.join(" ")} You can view the compiled prompt or place a test call.`
+      ? `Done — ${lines.join(" ")} You can view the compiled prompt or place a test call.`
       : "No changes were needed — the spec already matches that.";
     write?.(reply);
     return { reply, done: true };

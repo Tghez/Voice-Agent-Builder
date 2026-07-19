@@ -34,7 +34,6 @@ export const BuilderAnnotation = Annotation.Root({
   diff: Annotation<SpecDiff | undefined>(),
   compiledPrompt: Annotation<string | undefined>(),
   assistantId: Annotation<string | undefined>(),
-  version: Annotation<number | undefined>(),
 
   // test_call staging (confirmation happens in the UI)
   testCall: Annotation<{ note: string } | undefined>(),

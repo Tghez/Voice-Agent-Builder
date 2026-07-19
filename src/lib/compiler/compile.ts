@@ -11,7 +11,7 @@ import type { VapiClient } from "./vapiClient";
  *  2. Build the Vapi Assistant object (pure, byte-identical per spec).
  *  3. Sync: PATCH if we already have an assistant id, else POST.
  *
- * Persisting the new spec version + vapiAssistantId is the caller's job (db
+ * Persisting the updated spec + vapiAssistantId is the caller's job (db
  * layer) — this function stays free of storage concerns.
  */
 

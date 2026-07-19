@@ -8,15 +8,6 @@ export type CallMode = "test" | "live";
 export interface AgentRow {
   id: string;
   name: string;
-  current_version: number;
-  vapi_assistant_id: string | null;
-  created_at: string;
-}
-
-export interface AgentSpecRow {
-  id: string;
-  agent_id: string;
-  version: number;
   spec: AgentSpec;
   vapi_assistant_id: string | null;
   created_at: string;

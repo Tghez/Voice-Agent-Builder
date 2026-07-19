@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * AgentSpec — the canonical, versioned artifact that the builder produces and
+ * AgentSpec — the canonical artifact that the builder produces and
  * the compiler consumes. This file is the single source of the shared
  * vocabulary: the compiler, `qualify_lead`, the builder tools, and the evals
  * all speak these types. Nothing here knows about Vapi.
@@ -99,7 +99,6 @@ export const AgentSpecSchema = z.object({
   guardrails: z.array(z.string()),
   /** Set by the compiler after the first POST /assistant. */
   vapiAssistantId: z.string().optional(),
-  version: z.number().int().nonnegative(),
 });
 export type AgentSpec = z.infer<typeof AgentSpecSchema>;
 
@@ -122,6 +121,5 @@ export function emptySpec(): AgentSpec {
     },
     actions: [],
     guardrails: [],
-    version: 0,
   };
 }

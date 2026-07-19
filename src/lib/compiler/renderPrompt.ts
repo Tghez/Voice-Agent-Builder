@@ -4,9 +4,9 @@ import type { AgentSpec, Criterion } from "@/lib/spec/schema";
  * renderPrompt — the compiler's core act: structured spec → the natural-language
  * system prompt the voice LLM runs on. DETERMINISTIC and LEAD-AGNOSTIC: it takes
  * only the spec and emits a `{{leadContext}}` placeholder that Vapi fills per-call
- * (via assistantOverrides.variableValues). One assistant is compiled per spec
- * version and reused across every lead — baking lead data in here would force a
- * recompile + PATCH per lead and defeat versioning.
+ * (via assistantOverrides.variableValues). One assistant is compiled per agent
+ * and reused across every lead — baking lead data in here would force a
+ * recompile + PATCH per lead.
  *
  * Context layering is deliberate (mitigates "lost in the middle": models recall
  * the start and end of a long prompt reliably but drop facts from the middle):

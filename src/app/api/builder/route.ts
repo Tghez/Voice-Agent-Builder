@@ -71,7 +71,6 @@ export async function POST(req: Request) {
               reply: finalState?.reply ?? "",
               route: finalState?.route ?? null,
               agentId: finalState?.agentId ?? agentId ?? null,
-              version: finalState?.version ?? null,
               diff: finalState?.diff ?? null,
               compiledPrompt: finalState?.compiledPrompt ?? null,
               testCall: finalState?.testCall ?? null,

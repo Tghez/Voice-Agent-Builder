@@ -10,7 +10,6 @@ interface CaseSummary {
 }
 interface RunSummary {
   runId?: string;
-  specVersion: number;
   total: number;
   passed: number;
   qualifyRate: number;
@@ -20,7 +19,6 @@ interface RunSummary {
 }
 interface RunRow {
   id: string;
-  spec_version: number | null;
   summary: RunSummary | null;
   created_at: string;
 }
@@ -94,7 +92,7 @@ export default function EvalsPage() {
             {agents.length === 0 && <option value="">No agents yet</option>}
             {agents.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.name} · v{a.current_version}
+                {a.name}
               </option>
             ))}
           </select>
@@ -111,8 +109,7 @@ export default function EvalsPage() {
       {error && <div className="text-sm text-red-600 dark:text-red-400">{error}</div>}
       {running && (
         <div className="text-sm text-black/50 dark:text-white/50">
-          Running ~10 persona conversations against v
-          {agents.find((a) => a.id === agentId)?.current_version}… this takes a minute.
+          Running ~10 persona conversations… this takes a minute.
         </div>
       )}
 
@@ -132,7 +129,7 @@ export default function EvalsPage() {
 
           <section className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-white/[0.03]">
             <div className="px-4 py-3 border-b border-black/10 dark:border-white/10 text-sm font-medium">
-              Cases · spec v{latest.specVersion}
+              Cases
             </div>
             <ul className="divide-y divide-black/[0.06] dark:divide-white/[0.08]">
               {latest.cases.map((c) => (
@@ -167,7 +164,6 @@ export default function EvalsPage() {
             {runs.map((r) => (
               <li key={r.id} className="flex items-center gap-3 text-[13px] text-black/60 dark:text-white/60">
                 <span>{new Date(r.created_at).toLocaleString()}</span>
-                <span>v{r.spec_version}</span>
                 {r.summary && (
                   <span>
                     {r.summary.passed}/{r.summary.total} passed · qualify {r.summary.qualifyRate}%
@@ -181,7 +177,7 @@ export default function EvalsPage() {
 
       {!latest && !running && (
         <div className="text-sm text-black/50 dark:text-white/50">
-          Pick an agent and run the harness to see per-case pass/fail tied to the spec version.
+          Pick an agent and run the harness to see per-case pass/fail.
         </div>
       )}
     </div>

@@ -33,7 +33,7 @@ async function turn(message: string) {
   });
 
   console.log(`\n> ${message}`);
-  console.log(`  route=${r.route}  version=${r.version ?? "-"}  agentId=${r.agentId ?? "-"}`);
+  console.log(`  route=${r.route}  agentId=${r.agentId ?? "-"}`);
   if (r.toolLog?.length) console.log(`  edits: ${r.toolLog.join(", ")}`);
   console.log(`  reply: ${r.reply}`);
 
