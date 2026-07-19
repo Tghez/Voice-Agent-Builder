@@ -77,7 +77,7 @@ export const RuntimeToolSchema = z.enum([
 export type RuntimeTool = z.infer<typeof RuntimeToolSchema>;
 
 export const IdentitySchema = z.object({
-  name: z.string().min(1),
+  name: z.string(),
   persona: z.string(),
   voice: VoiceSchema,
   firstMessage: z.string(),
@@ -103,16 +103,17 @@ export const AgentSpecSchema = z.object({
 export type AgentSpec = z.infer<typeof AgentSpecSchema>;
 
 /**
- * A minimal valid starting spec. The builder mutates this via pure tools; the
- * compiler will reject it at parse time only if a later edit makes it invalid.
+ * A minimal valid starting spec — genuinely blank, no placeholder identity.
+ * The builder mutates this via pure tools; the compiler will reject it at
+ * parse time only if a later edit makes it invalid.
  */
 export function emptySpec(): AgentSpec {
   return {
     identity: {
-      name: "Maya",
-      persona: "A warm, concise sales development rep.",
+      name: "",
+      persona: "",
       voice: "friendly-female",
-      firstMessage: "Hi, this is Maya — do you have a quick minute?",
+      firstMessage: "",
     },
     goal: "",
     qualification: {

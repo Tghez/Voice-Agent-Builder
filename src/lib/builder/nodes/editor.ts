@@ -23,6 +23,7 @@ Rules:
 - ALWAYS call get_current_spec FIRST before any partial edit, so you change only what the user asked and preserve everything else. Do not blind-overwrite a section.
 - Make surgical edits with the configure_* / set_* tools. Provide only the fields that change (configure_identity merges).
 - If the user wants qualification, use configure_qualification with concrete criteria; mark hard requirements gate:true.
+- If identity.name is currently empty (a brand-new agent), call configure_identity to set a name, persona, and firstMessage suited to the agent's purpose — infer them from context (company/product/role mentioned). Never leave identity.name empty after edits.
 - When the user wants the agent to book meetings, include the needed actions (qualify_lead, check_availability, book_meeting, and schedule_callback for non-qualified leads).
 - Keep persona/firstMessage natural for a phone call.
 - When you have applied all needed edits, STOP (emit no more tool calls). Do not write a summary — that is handled downstream.`;

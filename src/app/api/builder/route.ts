@@ -65,16 +65,21 @@ export async function POST(req: Request) {
             finalState = chunk as Partial<BuilderState>;
           }
         }
+        const resolvedAgentId = finalState?.agentId ?? agentId ?? null;
         controller.enqueue(
           encoder.encode(
             sseEvent("done", {
               reply: finalState?.reply ?? "",
               route: finalState?.route ?? null,
-              agentId: finalState?.agentId ?? agentId ?? null,
+              agentId: resolvedAgentId,
               diff: finalState?.diff ?? null,
               compiledPrompt: finalState?.compiledPrompt ?? null,
               testCall: finalState?.testCall ?? null,
-              spec: finalState?.workingSpec,
+              // No agentId means no agent has actually been created/persisted
+              // yet — workingSpec is just the blank starting template, not a
+              // real spec, so don't send it (the client would render it as
+              // if an agent exists).
+              spec: resolvedAgentId ? finalState?.workingSpec : null,
             }),
           ),
         );
