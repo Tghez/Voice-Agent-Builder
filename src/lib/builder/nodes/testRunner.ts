@@ -1,3 +1,4 @@
+import { getWriter } from "@langchain/langgraph";
 import type { BuilderState } from "../state";
 
 /**
@@ -6,9 +7,11 @@ import type { BuilderState } from "../state";
  * confirm:true. This keeps "place a call" behind an explicit user action.
  */
 export async function testRunnerNode(_state: BuilderState): Promise<Partial<BuilderState>> {
+  const reply =
+    "Ready to place a test call with this agent. Pick a lead and confirm — I'll dial your demo number (~$0.13/min, a real call).";
+  getWriter()?.(reply);
   return {
-    reply:
-      "Ready to place a test call with this agent. Pick a lead and confirm — I'll dial your demo number (~$0.13/min, a real call).",
+    reply,
     testCall: { note: "awaiting lead selection + confirm" },
     done: true,
   };

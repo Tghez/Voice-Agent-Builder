@@ -96,7 +96,7 @@ app/
   page.tsx              Builder chat (diff chips, view-compiled-prompt, live spec panel, sends history)
   dashboard/page.tsx    leads (CRM look) + confirm-gated Call + calls view + aggregates
   evals/page.tsx        run harness + per-case pass/fail tied to spec_version
-  api/builder/route.ts  one chat turn → graph.invoke (loads spec by agentId, accepts history)
+  api/builder/route.ts  one chat turn → graph.stream() as SSE (loads spec by agentId, accepts history)
   api/calls/route.ts    POST place call (requires confirm:true, 428 otherwise) + GET list
   api/vapi/tools/route.ts   runtime tool webhook (message.toolCallList → {results})
   api/vapi/events/route.ts  end-of-call webhook (persist first, then Track-2 intent)
@@ -136,10 +136,21 @@ current_version + vapi_assistant_id) · `agent_specs` (versioned jsonb, unique(a
   through `env.ts`): `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`.
   `getAnthropic()` (`llm/client.ts`) wraps its client with `wrapAnthropic`, so every LLM
   call across the builder graph, eval judge, and Track-2 intent traces automatically.
-  Inside `builderGraph.invoke()` (api/builder/route.ts, scripts) each node — router,
-  clarifier, editor, compiler, responder, test_runner — is its own child run, so a
+  Inside `builderGraph.invoke()`/`.stream()` (api/builder/route.ts, scripts) each node —
+  router, clarifier, editor, compiler, responder, test_runner — is its own child run, so a
   single builder turn shows up in LangSmith as one nested trace with per-phase timing
   and token usage. No code path breaks with tracing unset: unset/false is a silent no-op.
+- **Builder chat is SSE-streamed.** api/builder/route.ts calls `builderGraph.stream(input,
+  { streamMode: ["custom", "values"] })` instead of `.invoke()`. Nodes that set `reply`
+  (responder, clarifier, test_runner) push text chunks onto the "custom" channel via
+  `getWriter()?.(chunk)` — call `getWriter()` ONCE synchronously at the top of the node
+  (before any `await`/event-callback) and reuse the returned function; re-deriving it
+  inside a later callback (e.g. an Anthropic `stream.on("text", ...)` handler) can miss
+  the AsyncLocalStorage context. The API route interleaves `"token"` SSE events (custom
+  chunks) with a final `"done"` event carrying the last `"values"` snapshot (route, diff,
+  version, compiledPrompt, spec, agentId). `src/app/page.tsx` reads the fetch body as a
+  stream and parses `event:`/`data:` blocks by hand (no `EventSource`, since that only
+  supports GET).
 
 ## Commands
 
@@ -172,6 +183,11 @@ current_version + vapi_assistant_id) · `agent_specs` (versioned jsonb, unique(a
   `/rest/v1`. Missing table grants → run `0002_grants.sql`.
 - **tsx scripts**: no top-level await (wrap in `async main()`); tsx DOES resolve the `@/`
   tsconfig path alias.
+- **`@langchain/langgraph`'s bare `writer()` export is broken in v1.4.8** — it reads
+  `config.configurable.writer`, but `Pregel.stream()` only ever sets `config.writer`
+  (top-level), so calling `writer(chunk)` silently no-ops (no error, no emitted event).
+  `getWriter()` checks both locations and works — use that instead. See the SSE-streaming
+  note above.
 - **Vapi webhook shapes** (verified against docs): tool-calls = `message.toolCallList[].{id,name,arguments}`,
   respond `{results:[{toolCallId,result}]}`. Correlation via `message.call.metadata`
   (`callRowId`/`agentId`/`leadId`, set in initiateCall). End-of-call = `message.type ===

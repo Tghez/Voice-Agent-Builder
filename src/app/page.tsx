@@ -23,12 +23,6 @@ interface ChatMessage {
   meta?: AssistantMeta;
 }
 
-const SUGGESTIONS = [
-  "Create an agent named Maya that qualifies leads with a sales team of at least 10 and books a demo if they qualify.",
-  "Make her friendlier and more concise.",
-  "Add a guardrail: never quote pricing.",
-];
-
 export default function BuilderPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -39,10 +33,18 @@ export default function BuilderPage() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [agents, setAgents] = useState<AgentOption[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [input]);
 
   const refreshAgents = useCallback(() => {
     fetch("/api/agents")
@@ -70,11 +72,20 @@ export default function BuilderPage() {
     ]);
   }
 
+  function updateLastMessage(patch: Partial<ChatMessage>) {
+    setMessages((m) => {
+      if (m.length === 0) return m;
+      const next = [...m];
+      next[next.length - 1] = { ...next[next.length - 1], ...patch };
+      return next;
+    });
+  }
+
   async function send(text: string) {
     if (!text.trim() || loading) return;
     // Prior turns of this session (before adding the current one) = the history.
     const history = messages.map((m) => ({ role: m.role, content: m.text }));
-    setMessages((m) => [...m, { role: "user", text }]);
+    setMessages((m) => [...m, { role: "user", text }, { role: "assistant", text: "" }]);
     setInput("");
     setLoading(true);
     try {
@@ -83,27 +94,55 @@ export default function BuilderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, agentId, history }),
       });
-      const data = await res.json();
-      if (data.error) {
-        setMessages((m) => [...m, { role: "assistant", text: `Error: ${data.error}` }]);
-      } else {
-        setMessages((m) => [
-          ...m,
-          {
-            role: "assistant",
-            text: data.reply || "(no reply)",
-            meta: { route: data.route, version: data.version, diff: data.diff, testCall: data.testCall },
-          },
-        ]);
-        if (data.agentId) {
-          setAgentId(data.agentId);
-          refreshAgents(); // surface a newly created agent in the picker
+      if (!res.body) {
+        const data = await res.json().catch(() => ({}));
+        updateLastMessage({ text: `Error: ${data.error || res.statusText}` });
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let sep: number;
+        while ((sep = buffer.indexOf("\n\n")) !== -1) {
+          const rawEvent = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          let event = "message";
+          let dataLine = "";
+          for (const line of rawEvent.split("\n")) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataLine += line.slice(5).trim();
+          }
+          if (!dataLine) continue;
+          const parsed = JSON.parse(dataLine);
+
+          if (event === "token") {
+            accumulated += parsed.text ?? "";
+            updateLastMessage({ text: accumulated });
+          } else if (event === "done") {
+            updateLastMessage({
+              text: parsed.reply || accumulated || "(no reply)",
+              meta: { route: parsed.route, version: parsed.version, diff: parsed.diff, testCall: parsed.testCall },
+            });
+            if (parsed.agentId) {
+              setAgentId(parsed.agentId);
+              refreshAgents(); // surface a newly created agent in the picker
+            }
+            if (parsed.spec) setSpec(parsed.spec);
+            if (parsed.compiledPrompt) setCompiledPrompt(parsed.compiledPrompt);
+          } else if (event === "error") {
+            updateLastMessage({ text: `Error: ${parsed.error}` });
+          }
         }
-        if (data.spec) setSpec(data.spec);
-        if (data.compiledPrompt) setCompiledPrompt(data.compiledPrompt);
       }
     } catch (e) {
-      setMessages((m) => [...m, { role: "assistant", text: `Error: ${(e as Error).message}` }]);
+      updateLastMessage({ text: `Error: ${(e as Error).message}` });
     } finally {
       setLoading(false);
     }
@@ -147,25 +186,12 @@ export default function BuilderPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {messages.length === 0 && (
-            <div className="space-y-3">
-              <p className="text-sm text-black/60 dark:text-white/60">Try one of these:</p>
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => send(s)}
-                  className="block w-full text-left text-sm px-3 py-2 rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/[0.03] dark:hover:bg-white/5"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
-
           {messages.map((m, i) => (
             <Message key={i} m={m} />
           ))}
-          {loading && <div className="text-sm text-black/40 dark:text-white/40">Thinking…</div>}
+          {loading && messages[messages.length - 1]?.text === "" && (
+            <div className="text-sm text-black/40 dark:text-white/40">Thinking…</div>
+          )}
           <div ref={endRef} />
         </div>
 
@@ -174,20 +200,41 @@ export default function BuilderPage() {
             e.preventDefault();
             send(input);
           }}
-          className="border-t border-black/10 dark:border-white/10 p-3 flex gap-2"
+          className="border-t border-black/10 dark:border-white/10 p-3 flex gap-2 items-end"
         >
-          <input
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send(input);
+              }
+            }}
             placeholder="Describe or edit the agent…"
-            className="flex-1 rounded-lg border border-black/10 dark:border-white/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:focus:border-white/30"
+            rows={1}
+            className="flex-1 resize-none rounded-lg border border-black/10 dark:border-white/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:focus:border-white/30 max-h-[200px] overflow-y-auto"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="rounded-lg bg-black text-white dark:bg-white dark:text-black px-4 py-2 text-sm font-medium disabled:opacity-40"
+            aria-label="Send"
+            className="shrink-0 grid place-items-center h-9 w-9 rounded-full bg-black text-white dark:bg-white dark:text-black disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:opacity-80 transition-opacity"
           >
-            Send
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="M12 19V5" />
+              <path d="M5 12l7-7 7 7" />
+            </svg>
           </button>
         </form>
       </section>

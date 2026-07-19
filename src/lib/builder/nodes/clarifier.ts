@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { getWriter } from "@langchain/langgraph";
 import { getAnthropic } from "@/lib/llm/client";
 import { env } from "@/lib/env";
 import { historyToMessages } from "../history";
@@ -34,6 +35,7 @@ export async function clarifierNode(state: BuilderState): Promise<Partial<Builde
 
   const out = resp.parsed_output;
   if (out?.needsClarification && out.question) {
+    getWriter()?.(out.question);
     return { reply: out.question, done: true };
   }
   return { done: false };
