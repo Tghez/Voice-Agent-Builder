@@ -42,13 +42,16 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await builderGraph.invoke({
-      userMessage: message,
-      history,
-      agentId,
-      workingSpec,
-      prevSpec,
-    });
+    const result = await builderGraph.invoke(
+      {
+        userMessage: message,
+        history,
+        agentId,
+        workingSpec,
+        prevSpec,
+      },
+      { runName: "builder-turn", tags: agentId ? [`agent:${agentId}`] : ["agent:new"] },
+    );
 
     return NextResponse.json({
       reply: result.reply ?? "",

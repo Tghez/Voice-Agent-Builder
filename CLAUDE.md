@@ -88,7 +88,9 @@ lib/
   db/repositories/      agents, calls, evals (typed data access — no raw queries elsewhere)
   evals/personas.ts     10 personas w/ ground-truth attributes + roleplay briefs
   evals/runner.ts       LLM-as-lead ↔ agent (same prompt+tools, real tool exec) + LLM-as-judge
-  llm/client.ts         shared Anthropic client (getAnthropic())
+  llm/client.ts         shared Anthropic client (getAnthropic()), wrapped with LangSmith's
+                        wrapAnthropic — traces every call, nested under the current
+                        LangGraph node when invoked inside builderGraph.invoke()
   env.ts                single typed source for ALL env access
 app/
   page.tsx              Builder chat (diff chips, view-compiled-prompt, live spec panel, sends history)
@@ -130,6 +132,14 @@ current_version + vapi_assistant_id) · `agent_specs` (versioned jsonb, unique(a
   `CALCOM_API_KEY`/`CALCOM_EVENT_TYPE_ID` (optional — mock calendar used when unset).
 - `.env.local` is gitignored (only `.env.example` is committed). It was created from the
   template and filled in by the user.
+- **LangSmith tracing** (optional, read directly by the `langsmith` package — not routed
+  through `env.ts`): `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`.
+  `getAnthropic()` (`llm/client.ts`) wraps its client with `wrapAnthropic`, so every LLM
+  call across the builder graph, eval judge, and Track-2 intent traces automatically.
+  Inside `builderGraph.invoke()` (api/builder/route.ts, scripts) each node — router,
+  clarifier, editor, compiler, responder, test_runner — is its own child run, so a
+  single builder turn shows up in LangSmith as one nested trace with per-phase timing
+  and token usage. No code path breaks with tracing unset: unset/false is a silent no-op.
 
 ## Commands
 
