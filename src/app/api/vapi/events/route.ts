@@ -3,12 +3,14 @@ import {
   applyEndOfCall,
   findByVapiCallId,
   getOrCreateCallRow,
+  getOutcome,
   mergeOutcome,
 } from "@/lib/db/repositories/calls";
 import { getAgentByAssistantId } from "@/lib/db/repositories/agents";
 import { getCRM } from "@/lib/providers/crm";
 import { scoreIntent } from "@/lib/scoring/intent";
 import { transcriptToText } from "@/lib/transcript";
+import type { StructuredOutcome } from "@/lib/db/types";
 
 /**
  * Vapi end-of-call webhook. Vapi POSTs many message types here; we act only on
@@ -68,15 +70,22 @@ export async function POST(req: Request) {
     cost_usd,
   });
 
-  // Capture Vapi's structured extraction if present (from analysisPlan).
+  // Capture Vapi's structured extraction if present (from analysisPlan) — but
+  // only to FILL IN fields the in-call tools never set (e.g. the call dropped
+  // before qualify_lead/book_meeting ran). qualify_lead and book_meeting/
+  // schedule_callback are the deterministic ground truth for these fields;
+  // Vapi's own end-of-call transcript analysis must never overwrite them,
+  // the same way Track-2 intent below is advisory and never overrides a
+  // hard gate.
   const structured = message.analysis?.structuredData;
   if (structured && typeof structured === "object") {
     const s = structured as Record<string, unknown>;
-    await mergeOutcome(callRowId, {
-      extracted: s,
-      meeting_booked: Boolean(s.meeting_booked),
-      callback_scheduled: Boolean(s.callback_scheduled),
-    });
+    const existing = await getOutcome(callRowId);
+    const patch: Partial<StructuredOutcome> = {};
+    if (existing?.extracted === undefined) patch.extracted = s;
+    if (existing?.meeting_booked === undefined) patch.meeting_booked = Boolean(s.meeting_booked);
+    if (existing?.callback_scheduled === undefined) patch.callback_scheduled = Boolean(s.callback_scheduled);
+    if (Object.keys(patch).length > 0) await mergeOutcome(callRowId, patch);
   }
 
   // 3) Track-2 intent — advisory, failure-tolerant.

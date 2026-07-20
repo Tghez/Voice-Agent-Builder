@@ -82,6 +82,17 @@ export async function getOrCreateCallRow(vapiCallId: string, agentId: string): P
   return data;
 }
 
+export async function getOutcome(callId: string): Promise<StructuredOutcome | null> {
+  const db = serviceClient();
+  const { data, error } = await db
+    .from("calls")
+    .select("structured_outcome")
+    .eq("id", callId)
+    .maybeSingle<{ structured_outcome: StructuredOutcome | null }>();
+  if (error) throw error;
+  return data?.structured_outcome ?? null;
+}
+
 /** Shallow-merge a partial outcome into structured_outcome (read-then-write). */
 export async function mergeOutcome(
   callId: string,
