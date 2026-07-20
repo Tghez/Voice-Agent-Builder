@@ -27,8 +27,10 @@ export function EvalCaseDrawer({
       >
         <div className="sticky top-0 bg-white dark:bg-[#141414] px-4 py-3 border-b border-black/10 dark:border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <Tag tone={detail.passed ? "green" : "red"}>{detail.passed ? "PASS" : "FAIL"}</Tag>
-            <div className="font-medium text-sm truncate">{detail.id}</div>
+            <Tag tone={detail.passed ? "green" : "amber"}>
+              {detail.passed ? "Passed" : "Needs Revision"}
+            </Tag>
+            <div className="font-medium text-sm truncate">{detail.persona?.id ?? detail.id}</div>
           </div>
           <button
             onClick={onClose}
@@ -41,10 +43,10 @@ export function EvalCaseDrawer({
         <div className="p-4 space-y-6 text-sm">
           {reasons.length > 0 && (
             <section>
-              <div className="text-[11px] uppercase tracking-wide text-red-600/70 dark:text-red-400/70 mb-1.5">
-                Why it failed
+              <div className="text-[11px] uppercase tracking-wide text-amber-600/80 dark:text-amber-400/80 mb-1.5">
+                What to improve
               </div>
-              <ul className="list-disc list-inside space-y-0.5 text-[13px] text-red-700 dark:text-red-400">
+              <ul className="list-disc list-inside space-y-0.5 text-[13px] text-amber-700 dark:text-amber-400">
                 {reasons.map((r, i) => (
                   <li key={i}>{r}</li>
                 ))}

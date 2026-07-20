@@ -41,6 +41,8 @@ export function RunningBanner({
               label="Run 10 conversations"
               state={phase === "running" ? "active" : "pending"}
             />
+            <span className="text-black/30 dark:text-white/30">·</span>
+            <span>This may take a few minutes</span>
           </div>
         </div>
         <div className="shrink-0 text-[12px] tabular-nums text-black/45 dark:text-white/45">

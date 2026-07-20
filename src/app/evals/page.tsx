@@ -172,13 +172,13 @@ export default function EvalsPage() {
                     >
                       <span
                         className={
-                          "mt-0.5 shrink-0 text-[11px] px-2 py-0.5 rounded-full " +
+                          "mt-0.5 shrink-0 w-16 text-center text-[11px] leading-tight px-2 py-0.5 rounded-xl " +
                           (c.passed
                             ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                            : "bg-red-500/10 text-red-700 dark:text-red-400")
+                            : "bg-amber-500/10 text-amber-700 dark:text-amber-400")
                         }
                       >
-                        {c.passed ? "PASS" : "FAIL"}
+                        {c.passed ? "Passed" : "Needs Revision"}
                       </span>
                       <div className="min-w-0">
                         <div className="font-medium">{c.id}</div>
