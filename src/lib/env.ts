@@ -46,4 +46,13 @@ export const env = {
 
   /** Demo phone every lead routes to (never dials a real prospect). */
   demoPhone: (): string => process.env.DEMO_PHONE ?? "+10000000000",
+
+  /**
+   * Real, deliverable email every Cal.com booking's attendee routes to (never
+   * used elsewhere — lead.email stays the seeded, cosmetic value everywhere
+   * except the actual booking call). Seed leads use reserved-TLD `.example`
+   * addresses on purpose (never real mail); Cal.com validates deliverability
+   * and rejects those with a 400, so a real booking needs a real inbox.
+   */
+  demoEmail: (): string | undefined => optional("DEMO_EMAIL"),
 } as const;

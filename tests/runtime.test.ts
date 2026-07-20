@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { dispatchTool, type ToolSession } from "@/lib/runtime/handlers";
-import { MockCalendar } from "@/lib/providers/calendar";
+import { MockCalendar, type BookArgs, type BookResult } from "@/lib/providers/calendar";
 import type { Qualification } from "@/lib/spec/schema";
 import type { StructuredOutcome } from "@/lib/db/types";
 
@@ -73,5 +73,35 @@ describe("runtime tool handlers", () => {
     const msg = await dispatchTool("schedule_callback", { preferred_time: "tomorrow 2pm" }, session);
     expect(msg).toContain("Callback logged");
     expect(outcome.callback_scheduled).toBe(true);
+  });
+
+  it("book_meeting routes the booking email to DEMO_EMAIL, never the lead's seeded (fake) email", async () => {
+    const originalDemoEmail = process.env.DEMO_EMAIL;
+    process.env.DEMO_EMAIL = "demo@real-inbox.com";
+    try {
+      let receivedEmail: string | undefined;
+      const spyCalendar = {
+        getSlots: async () => [],
+        book: async (args: BookArgs): Promise<BookResult> => {
+          receivedEmail = args.email;
+          return {
+            confirmed: true,
+            bookingId: "b1",
+            slot: { id: "s1", startISO: args.slot, label: args.slot },
+            detail: "Booked.",
+          };
+        },
+      };
+      const { session } = makeSession(QUAL);
+      session.calendar = spyCalendar;
+      await dispatchTool(
+        "book_meeting",
+        { slot: "2026-07-19T15:00:00.000Z", name: "Daniel", email: "daniel.cho@brightpath.example" },
+        session,
+      );
+      expect(receivedEmail).toBe("demo@real-inbox.com");
+    } finally {
+      process.env.DEMO_EMAIL = originalDemoEmail;
+    }
   });
 });

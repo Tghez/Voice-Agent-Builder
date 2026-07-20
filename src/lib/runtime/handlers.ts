@@ -2,6 +2,7 @@ import type { CalendarProvider } from "@/lib/providers/calendar";
 import type { Qualification } from "@/lib/spec/schema";
 import type { StructuredOutcome } from "@/lib/db/types";
 import { scoreFit } from "@/lib/scoring/fit";
+import { env } from "@/lib/env";
 
 /**
  * Runtime tool handlers — the voice agent's tools, executed on our server. These
@@ -38,7 +39,10 @@ export async function checkAvailability(
   return (
     "Open times: " +
     slots.map((sl) => `${sl.label} [${sl.startISO}]`).join("; ") +
-    ". Offer one and pass its bracketed time to book_meeting."
+    ". Read these out as distinct options (do not summarize them into a range) " +
+    "and have the lead confirm one exact time. Only call book_meeting with the " +
+    "bracketed ISO value of the time they confirmed — if their answer is vague " +
+    "or doesn't clearly match one of these options, ask them to pick one before calling book_meeting."
   );
 }
 
@@ -47,7 +51,12 @@ export async function bookMeeting(
   s: ToolSession,
 ): Promise<string> {
   if (!args.slot) return "I need a specific time slot to book. Call check_availability first.";
-  const res = await s.calendar.book({ slot: args.slot, name: args.name, email: args.email });
+  // Seed leads carry cosmetic .example emails (never real mail) so they read
+  // naturally in the transcript/lead-context, but a real Cal.com booking needs
+  // a real, deliverable inbox — same "never touch a real prospect" idea as
+  // DEMO_PHONE, scoped to just the booking call so lead.email elsewhere is untouched.
+  const email = env.demoEmail() ?? args.email;
+  const res = await s.calendar.book({ slot: args.slot, name: args.name, email });
   await s.persistOutcome({
     meeting_booked: res.confirmed,
     meeting: res.confirmed

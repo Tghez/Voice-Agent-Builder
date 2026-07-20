@@ -70,7 +70,10 @@ export function renderPrompt(spec: AgentSpec): string {
     const booking: string[] = [];
     if (has("check_availability") && has("book_meeting")) {
       booking.push(
-        "If the lead qualifies: call check_availability, offer a slot, then call book_meeting to confirm.",
+        "If the lead qualifies: call check_availability, offer one of the specific times it returns, " +
+          "get the lead to confirm an exact time, then call book_meeting with that exact time. " +
+          "If the lead gives a vague answer (e.g. \"sometime Monday\") instead of picking one of the " +
+          "offered times, ask them to choose a specific one before calling book_meeting.",
       );
     } else if (has("book_meeting")) {
       booking.push("If the lead qualifies: call book_meeting to confirm a time.");
