@@ -48,7 +48,12 @@ export async function bookMeeting(
 ): Promise<string> {
   if (!args.slot) return "I need a specific time slot to book. Call check_availability first.";
   const res = await s.calendar.book({ slot: args.slot, name: args.name, email: args.email });
-  await s.persistOutcome({ meeting_booked: res.confirmed });
+  await s.persistOutcome({
+    meeting_booked: res.confirmed,
+    meeting: res.confirmed
+      ? { startISO: res.slot.startISO, label: res.slot.label, bookingId: res.bookingId }
+      : null,
+  });
   return res.confirmed
     ? `Booked. ${res.detail} Confirmation ${res.bookingId}.`
     : "I couldn't book that time — try another slot.";

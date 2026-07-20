@@ -8,6 +8,7 @@ import {
 import { getAgentByAssistantId } from "@/lib/db/repositories/agents";
 import { getCRM } from "@/lib/providers/crm";
 import { scoreIntent } from "@/lib/scoring/intent";
+import { transcriptToText } from "@/lib/transcript";
 
 /**
  * Vapi end-of-call webhook. Vapi POSTs many message types here; we act only on
@@ -17,22 +18,6 @@ import { scoreIntent } from "@/lib/scoring/intent";
  * THEN run Track-2 intent and patch it in. A flaky/timed-out intent call must
  * never lose the call record — that would destroy a demo recording.
  */
-
-interface TranscriptTurn {
-  role?: string;
-  message?: string;
-  content?: string;
-}
-
-function transcriptToText(t: unknown): string {
-  if (typeof t === "string") return t;
-  if (Array.isArray(t)) {
-    return (t as TranscriptTurn[])
-      .map((m) => `${m.role ?? ""}: ${m.message ?? m.content ?? ""}`.trim())
-      .join("\n");
-  }
-  return "";
-}
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));

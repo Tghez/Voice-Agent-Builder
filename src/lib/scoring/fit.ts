@@ -9,11 +9,22 @@ import type { Criterion, Qualification } from "@/lib/spec/schema";
  * rule; Track-2 intent is advisory and can NEVER change this outcome.
  */
 
+export interface FitCriterionResult {
+  field: string;
+  label: string;
+  gate: boolean;
+  weight: number;
+  met: boolean;
+  answer: unknown;
+}
+
 export interface FitResult {
   passed_gates: boolean;
   score: number; // 0–100 weighted
   qualified: boolean;
   reason: string;
+  passScore: number;
+  criteria: FitCriterionResult[];
 }
 
 type Answer = unknown;
@@ -112,5 +123,21 @@ export function scoreFit(
     reason = `Passed gates but score ${score} < ${scoring.passScore}.`;
   }
 
-  return { passed_gates, score, qualified, reason };
+  const criteriaResults: FitCriterionResult[] = evaluated.map((e) => ({
+    field: e.c.field,
+    label: e.c.label ?? e.c.field,
+    gate: e.c.gate,
+    weight: e.c.weight,
+    met: e.met,
+    answer: answers[e.c.field],
+  }));
+
+  return {
+    passed_gates,
+    score,
+    qualified,
+    reason,
+    passScore: scoring.passScore,
+    criteria: criteriaResults,
+  };
 }

@@ -119,9 +119,11 @@ export async function applyEndOfCall(
   if (error) throw error;
 }
 
-export async function listCalls(): Promise<CallRow[]> {
+export async function listCalls(agentId?: string): Promise<CallRow[]> {
   const db = serviceClient();
-  const { data, error } = await db.from("calls").select("*").order("created_at", { ascending: false });
+  let q = db.from("calls").select("*").order("created_at", { ascending: false });
+  if (agentId) q = q.eq("agent_id", agentId);
+  const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as CallRow[];
 }

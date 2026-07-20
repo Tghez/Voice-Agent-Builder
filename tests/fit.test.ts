@@ -72,6 +72,19 @@ describe("scoreFit — the invariant: a hard gate is decisive", () => {
     expect(r.score).toBe(100);
   });
 
+  it("reports a per-criterion breakdown (field, label, gate, weight, met, answer)", () => {
+    const q = qual([
+      crit({ field: "team_size", op: ">=", value: 10, gate: true, weight: 2, label: "Team size" }),
+      crit({ field: "has_budget", op: "==", value: true, weight: 1 }),
+    ]);
+    const r = scoreFit(q, { team_size: 8, has_budget: true });
+    expect(r.passScore).toBe(60);
+    expect(r.criteria).toEqual([
+      { field: "team_size", label: "Team size", gate: true, weight: 2, met: false, answer: 8 },
+      { field: "has_budget", label: "has_budget", gate: false, weight: 1, met: true, answer: true },
+    ]);
+  });
+
   it("mode 'all' requires every criterion; mode 'any' requires one", () => {
     const criteria = [
       crit({ field: "a", op: "==", value: true }),

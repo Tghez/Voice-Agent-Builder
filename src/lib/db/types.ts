@@ -27,6 +27,7 @@ export interface StructuredOutcome {
   intent?: IntentResult | null;
   extracted?: Record<string, unknown>;
   meeting_booked?: boolean;
+  meeting?: { startISO: string; label: string; bookingId: string } | null;
   callback_scheduled?: boolean;
 }
 

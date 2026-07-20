@@ -3,10 +3,11 @@ import { initiateCall } from "@/lib/call/initiateCall";
 import { listCalls } from "@/lib/db/repositories/calls";
 import type { CallMode } from "@/lib/db/types";
 
-/** List calls for the dashboard (newest first). */
-export async function GET() {
+/** List calls for the dashboard (newest first), optionally scoped to one agent. */
+export async function GET(req: Request) {
   try {
-    return NextResponse.json({ calls: await listCalls() });
+    const agentId = new URL(req.url).searchParams.get("agentId") ?? undefined;
+    return NextResponse.json({ calls: await listCalls(agentId) });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
