@@ -16,7 +16,7 @@ export function Hero({ started, panelOpen }: { started: boolean; panelOpen: bool
       }
       style={{ transform: `translate(${x}, ${y}) scale(${scale})` }}
     >
-      <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-500 dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
+      <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight bg-gradient-to-r from-amber-600 via-orange-500 to-red-500 dark:from-amber-400 dark:via-orange-400 dark:to-red-400 bg-clip-text text-transparent">
         What voice agent should we build today?
       </h1>
       <p className="mt-3 text-sm text-black/50 dark:text-white/50">
