@@ -1,11 +1,13 @@
 /**
- * Cheap validation of the eval harness: run 2 representative personas
- * (hot-qualified + pricing guardrail probe) against the latest agent's spec.
- * Does NOT persist. Run: npm run eval:smoke
+ * Cheap validation of the eval harness: generate the spec-grounded persona plan
+ * for the latest agent and run 2 representative slots (the qualified anchor + a
+ * guardrail probe if one exists, else the unqualified anchor). Does NOT persist.
+ * Run: npm run eval:smoke
  */
 import { getCurrentSpec, listAgents } from "../src/lib/db/repositories/agents";
 import { evaluateCase } from "../src/lib/evals/runner";
-import { PERSONAS } from "../src/lib/evals/personas";
+import { buildCasePlan } from "../src/lib/evals/casePlan";
+import { fleshOutPersonas } from "../src/lib/evals/personaGen";
 
 async function main() {
   const agents = await listAgents();
@@ -25,10 +27,18 @@ async function main() {
       .join(", ")}] · pass=${spec.qualification.scoring.passScore}`,
   );
 
-  const picks = [PERSONAS.find((p) => p.id === "hot-qualified")!, PERSONAS.find((p) => p.id === "guardrail-pricing")!];
+  const plan = buildCasePlan(spec);
+  const personas = await fleshOutPersonas(spec, plan);
+  const probe = personas.find((p) => p.guardrailProbe);
+  const picks = [
+    personas.find((p) => p.id === "qualified-anchor")!,
+    probe ?? personas.find((p) => p.id === "unqualified-anchor")!,
+  ];
+
   for (const p of picks) {
+    console.log(`\n[${p.id}] ${p.name} @ ${p.company} — ${p.brief}`);
     const r = await evaluateCase(spec, p);
-    console.log(`\n[${p.id}] passed=${r.passed}`);
+    console.log(`  passed=${r.passed}`);
     console.log(`  scores: ${JSON.stringify(r.scores)}`);
     console.log(`  judge:  ${r.judge_notes}`);
   }
