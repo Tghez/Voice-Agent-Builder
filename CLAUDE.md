@@ -82,7 +82,7 @@ lib/
   runtime/context.ts    build a live ToolSession from webhook correlation
   runtime/toolDefs.ts   Anthropic tool defs from a spec (for the eval agent)
   providers/crm.ts      CRMProvider + MockCRM + SupabaseCRM + getCRM() + renderLeadContext()
-  providers/calendar.ts CalendarProvider + MockCalendar + getCalendar()  (Cal.com = TODO)
+  providers/calendar.ts CalendarProvider + MockCalendar + CalcomCalendar + getCalendar()
   providers/seedLeads.ts shared 10-lead dataset (mock + SQL seed source of truth)
   call/initiateCall.ts  the ONE shared call service (chat test + dashboard live) + buildCallPayload (pure)
   db/client.ts          serviceClient() (tolerant of pasted /rest/v1 URL)
@@ -175,7 +175,10 @@ components/Nav.tsx       top nav
 - Vapi: number bought in Vapi (not a separate Twilio account), `VAPI_PHONE_NUMBER_ID` set. ✅
 - Anthropic key set; spend caps set in BOTH Vapi and Anthropic consoles. ✅
 - `DEMO_PHONE` set (a real number; every lead routes there — never dials a prospect). ✅
-- Cal.com: NOT configured → `getCalendar()` returns `MockCalendar`. Real `CalcomCalendar` = TODO.
+- Cal.com: `CalcomCalendar` implemented (`src/lib/providers/calendar.ts`, Cal.com API v2).
+  `getCalendar()` returns it once `CALCOM_API_KEY` + `CALCOM_EVENT_TYPE_ID` are set, else
+  `MockCalendar`. Google Calendar sync is a Cal.com-side setting (connect the Google
+  Calendar app as the event type's destination calendar) — not app code.
 
 ## Gotchas / lessons (save future debugging)
 
@@ -210,7 +213,6 @@ components/Nav.tsx       top nav
   **recompile the assistant** (any builder edit re-runs the compiler and updates `server.url`;
   existing assistants still point at localhost until re-compiled).
 - **README + Loom** — not written yet (graded deliverables). Deferred at user request.
-- **Cal.com real provider** — `CalcomCalendar` not implemented; mock used.
 - **Conversation persistence across reloads** — memory is in-session (client supplies the
   transcript). The spec persists via `agentId`; the raw chat does not. A `conversations`
   table would fix it if wanted.
