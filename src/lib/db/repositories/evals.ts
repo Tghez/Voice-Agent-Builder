@@ -1,9 +1,13 @@
 import { serviceClient } from "@/lib/db/client";
+import type { Persona, EvalCaseScores, Turn } from "@/lib/evals/types";
 
 export interface EvalCaseInput {
-  persona: string;
-  transcript: unknown;
-  scores: Record<string, unknown>;
+  /** Optional explicit row id — set so the run summary can reference the case before insert. */
+  id?: string;
+  /** Full persona object used for this run (jsonb) — immune to later golden-set regeneration. */
+  persona: Persona;
+  transcript: Turn[];
+  scores: EvalCaseScores;
   passed: boolean;
   judge_notes: string;
 }
@@ -12,6 +16,17 @@ export interface EvalRunRow {
   id: string;
   agent_id: string | null;
   summary: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface EvalCaseRow {
+  id: string;
+  run_id: string;
+  persona: Persona | null;
+  transcript: Turn[];
+  scores: EvalCaseScores;
+  passed: boolean;
+  judge_notes: string;
   created_at: string;
 }
 
@@ -34,6 +49,17 @@ export async function insertCases(runId: string, cases: EvalCaseInput[]): Promis
   const rows = cases.map((c) => ({ run_id: runId, ...c }));
   const { error } = await db.from("eval_cases").insert(rows);
   if (error) throw error;
+}
+
+export async function getCase(caseId: string): Promise<EvalCaseRow | null> {
+  const db = serviceClient();
+  const { data, error } = await db
+    .from("eval_cases")
+    .select("*")
+    .eq("id", caseId)
+    .maybeSingle<EvalCaseRow>();
+  if (error) throw error;
+  return data;
 }
 
 export async function listRuns(agentId?: string): Promise<EvalRunRow[]> {

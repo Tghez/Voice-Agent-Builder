@@ -1,6 +1,7 @@
 import type { AgentSpec } from "@/lib/spec/schema";
 import { serviceClient } from "@/lib/db/client";
 import type { AgentRow } from "@/lib/db/types";
+import type { Persona } from "@/lib/evals/types";
 
 /**
  * Agents: one live spec per agent, updated in place on every edit. All
@@ -56,6 +57,20 @@ export async function getAgentByAssistantId(assistantId: string): Promise<AgentR
 
 export async function getCurrentSpec(agent: AgentRow): Promise<AgentSpec | null> {
   return agent.spec ?? null;
+}
+
+/** Persist the golden persona set + the spec hash it was generated from (overwrite in place). */
+export async function savePersonaSet(
+  agentId: string,
+  personas: Persona[],
+  hash: string,
+): Promise<void> {
+  const db = serviceClient();
+  const { error } = await db
+    .from("agents")
+    .update({ persona_set: personas, persona_set_spec_hash: hash })
+    .eq("id", agentId);
+  if (error) throw error;
 }
 
 export async function listAgents(): Promise<AgentRow[]> {

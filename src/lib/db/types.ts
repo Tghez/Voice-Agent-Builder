@@ -1,5 +1,6 @@
 import type { AgentSpec } from "@/lib/spec/schema";
 import type { FitResult } from "@/lib/scoring/fit";
+import type { Persona } from "@/lib/evals/types";
 
 /** Row shapes mirroring supabase/migrations. Kept here so repositories are typed. */
 
@@ -10,6 +11,10 @@ export interface AgentRow {
   name: string;
   spec: AgentSpec;
   vapi_assistant_id: string | null;
+  /** Persisted golden persona set (regenerated only on a qualification-relevant spec change). */
+  persona_set: Persona[] | null;
+  /** Hash of the spec surface the persona_set was generated from (see personaGen). */
+  persona_set_spec_hash: string | null;
   created_at: string;
 }
 
