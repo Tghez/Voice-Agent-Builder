@@ -5,7 +5,7 @@ import type { AgentSpec } from "@/lib/spec/schema";
 import { Hero } from "@/components/builder/Hero";
 import { Composer } from "@/components/builder/Composer";
 import { MessagesView } from "@/components/builder/MessagesView";
-import { RightRail, type TabId } from "@/components/builder/RightRail";
+import { LeftRail, type TabId } from "@/components/builder/LeftRail";
 import type { AgentOption, ChatMessage } from "@/components/builder/types";
 
 export default function BuilderPage() {
@@ -242,7 +242,7 @@ export default function BuilderPage() {
         onSubmit={() => send(input)}
         loading={loading}
       />
-      <RightRail
+      <LeftRail
         agents={agents}
         agentId={agentId}
         spec={spec}

@@ -6,7 +6,7 @@ import type { AgentRow } from "@/lib/db/types";
  *  switcher, not a detail panel, so it doesn't need the full 20vw. */
 export const AGENT_RAIL_WIDTH = "clamp(140px, 10vw, 210px)";
 
-/** Left-side agent panel — mirrors the builder's RightRail (same slide/toggle
+/** Left-side agent panel — mirrors the builder's LeftRail (same slide/toggle
  *  chrome) but docked left, half the width, and open by default, since here
  *  "which agent am I looking at" is the primary orientation, not a secondary
  *  detail panel. */

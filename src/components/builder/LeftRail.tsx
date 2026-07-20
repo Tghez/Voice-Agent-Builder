@@ -15,7 +15,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "prompt", label: "Prompt" },
 ];
 
-interface RightRailProps {
+interface LeftRailProps {
   agents: AgentOption[];
   agentId: string | null;
   spec: AgentSpec | null;
@@ -28,13 +28,13 @@ interface RightRailProps {
   onTabChange: (tab: TabId) => void;
 }
 
-/** A fixed top-right toggle button opens/closes a panel occupying
+/** A fixed top-left toggle button opens/closes a panel occupying
  *  `RAIL_WIDTH` of the viewport, with a horizontal, click-to-switch tab bar
  *  inside — the chat area (Hero/Composer/MessagesView) shrinks to fill the
  *  remaining width in lockstep, driven by the same `open` boolean lifted to
  *  the page. `tab`/`onTabChange` are lifted too, so the page can force the
  *  panel to the Identity tab after a builder edit completes. */
-export function RightRail({
+export function LeftRail({
   agents,
   agentId,
   spec,
@@ -45,7 +45,7 @@ export function RightRail({
   onToggle,
   tab,
   onTabChange,
-}: RightRailProps) {
+}: LeftRailProps) {
   return (
     <>
       <button
@@ -54,7 +54,7 @@ export function RightRail({
         aria-label={open ? "Close panel" : "Open panel"}
         aria-pressed={open}
         className={
-          "fixed top-2.5 right-4 z-50 grid place-items-center h-9 w-9 rounded-lg border transition-colors cursor-pointer backdrop-blur " +
+          "fixed top-2.5 left-4 z-50 grid place-items-center h-9 w-9 rounded-lg border transition-colors cursor-pointer backdrop-blur " +
           (open
             ? "border-black/15 dark:border-white/20 bg-black/5 dark:bg-white/10 text-black dark:text-white"
             : "border-black/10 dark:border-white/15 bg-white/90 dark:bg-neutral-900/90 text-black/60 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/10 hover:text-black dark:hover:text-white")
@@ -62,13 +62,13 @@ export function RightRail({
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
           <rect x="3" y="4" width="18" height="16" rx="2" />
-          <line x1="15" y1="4" x2="15" y2="20" />
+          <line x1="9" y1="4" x2="9" y2="20" />
         </svg>
       </button>
 
       <div
-        className="fixed top-14 bottom-0 right-0 z-40 border-l border-black/10 dark:border-white/10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur shadow-xl flex flex-col transition-transform duration-300 ease-out"
-        style={{ width: RAIL_WIDTH, transform: open ? "translateX(0)" : "translateX(100%)" }}
+        className="fixed top-14 bottom-0 left-0 z-40 border-r border-black/10 dark:border-white/10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur shadow-xl flex flex-col transition-transform duration-300 ease-out"
+        style={{ width: RAIL_WIDTH, transform: open ? "translateX(0)" : "translateX(-100%)" }}
       >
         <div className="flex border-b border-black/10 dark:border-white/10 shrink-0">
           {TABS.map((t) => (

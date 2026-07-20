@@ -23,10 +23,10 @@ export function MessagesView({ started, panelOpen, messages, loading }: Messages
   return (
     <div
       className={
-        "fixed left-0 top-14 bottom-0 overflow-y-auto transition-[right,opacity] duration-[400ms] ease-in-out " +
+        "fixed right-0 top-14 bottom-0 overflow-y-auto transition-[left,opacity] duration-[400ms] ease-in-out " +
         (started ? "opacity-100" : "opacity-0 pointer-events-none")
       }
-      style={{ right: panelOpen ? RAIL_WIDTH : "0" }}
+      style={{ left: panelOpen ? RAIL_WIDTH : "0" }}
     >
       <div className="mx-auto max-w-3xl px-4 pt-10 pb-40 space-y-4">
         {messages.map((m, i) => {

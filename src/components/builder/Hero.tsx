@@ -1,11 +1,11 @@
 import { RAIL_WIDTH } from "./constants";
 
 /** Pre-chat centered headline. Fades and shrinks out of the way once the
- *  conversation starts, and re-centers within the left 80% while the right
+ *  conversation starts, and re-centers within the right 80% while the left
  *  panel is open. Positioned with an inline transform (rather than Tailwind
  *  translate utilities) so nothing else touches the `transform` property. */
 export function Hero({ started, panelOpen }: { started: boolean; panelOpen: boolean }) {
-  const x = panelOpen ? `calc(-50% - (${RAIL_WIDTH}) / 2)` : "-50%";
+  const x = panelOpen ? `calc(-50% + (${RAIL_WIDTH}) / 2)` : "-50%";
   const y = started ? "calc(42vh - 190px)" : "calc(42vh - 170px)";
   const scale = started ? 0.96 : 1;
   return (

@@ -15,7 +15,7 @@ interface ComposerProps {
 /** The pill-shaped input. Always mounted at the same DOM position so typed
  *  text/focus survive the transition; only its `transform` (computed inline
  *  from `started`/`panelOpen`) animates it between screen-center and
- *  docked-at-bottom, and re-centers within the left 80% when the right
+ *  docked-at-bottom, and re-centers within the right 80% when the left
  *  panel is open. */
 export function Composer({ started, panelOpen, value, onChange, onSubmit, loading }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -27,7 +27,7 @@ export function Composer({ started, panelOpen, value, onChange, onSubmit, loadin
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [value]);
 
-  const x = panelOpen ? `calc(-50% - (${RAIL_WIDTH}) / 2)` : "-50%";
+  const x = panelOpen ? `calc(-50% + (${RAIL_WIDTH}) / 2)` : "-50%";
   const y = started ? "calc(100vh - 112px)" : "calc(42vh - 32px)";
 
   return (
