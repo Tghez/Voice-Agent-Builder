@@ -91,6 +91,15 @@ const TOOL_DESCRIPTIONS: Record<RuntimeTool, string> = {
   schedule_callback: "Log a callback request for a lead who did not qualify or wants to be reached later.",
 };
 
+/** Spoken while the tool call is in flight, in place of Vapi's generic
+ *  repeated "give me a sec" filler — tells the lead what's happening. */
+const TOOL_START_MESSAGES: Record<RuntimeTool, string> = {
+  qualify_lead: "Let me quickly check that against what we're looking for.",
+  check_availability: "Let me pull up the calendar.",
+  book_meeting: "Booking that for us.",
+  schedule_callback: "One sec, setting up that callback.",
+};
+
 function toVapiTool(spec: AgentSpec, tool: RuntimeTool, toolsUrl: string) {
   return {
     type: "function" as const,
@@ -100,6 +109,7 @@ function toVapiTool(spec: AgentSpec, tool: RuntimeTool, toolsUrl: string) {
       parameters: toolParameters(spec, tool),
     },
     server: { url: toolsUrl },
+    messages: [{ type: "request-start" as const, content: TOOL_START_MESSAGES[tool] }],
   };
 }
 

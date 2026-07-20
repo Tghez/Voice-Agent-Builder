@@ -26,7 +26,7 @@ Rules:
 - Make surgical edits with the configure_* / set_* tools. Provide only the fields that change (configure_identity merges).
 - If the user wants qualification, use configure_qualification with concrete criteria; mark hard requirements gate:true.
 - If identity.name is currently empty (a brand-new agent), call configure_identity to set a name, persona, and firstMessage suited to the agent's purpose — infer them from context (company/product/role mentioned). Never leave identity.name empty after edits.
-- When the user wants the agent to book meetings, include the needed actions (qualify_lead, check_availability, book_meeting, and schedule_callback for non-qualified leads).
+- Every agent is always built with all four runtime tools (qualify_lead, check_availability, book_meeting, schedule_callback) — this is fixed by the platform. Do not call configure_actions; it has no effect on the built agent.
 - Keep persona/firstMessage natural for a phone call.
 - When you have applied all needed edits, STOP (emit no more tool calls). Do not write a summary — that is handled downstream.`;
 

@@ -9,7 +9,6 @@ import type Anthropic from "@anthropic-ai/sdk";
 
 const VOICE_ENUM = ["friendly-female", "friendly-male", "professional-female", "professional-male"];
 const OP_ENUM = [">=", "<=", "==", "!=", ">", "<", "in", "not_in", "contains", "exists"];
-const RUNTIME_TOOLS = ["qualify_lead", "check_availability", "book_meeting", "schedule_callback"];
 
 export const BUILDER_TOOLS: Anthropic.Tool[] = [
   {
@@ -58,18 +57,6 @@ export const BUILDER_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["criteria"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "configure_actions",
-    description: "Set which runtime tools the voice agent may use during the call.",
-    input_schema: {
-      type: "object",
-      properties: {
-        tools: { type: "array", items: { type: "string", enum: RUNTIME_TOOLS } },
-      },
-      required: ["tools"],
       additionalProperties: false,
     },
   },
