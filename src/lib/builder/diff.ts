@@ -20,9 +20,10 @@ export interface SpecDiff {
 /**
  * Stable, key-order-insensitive stringify. The DB returns jsonb with arbitrary
  * key order, so a plain JSON.stringify would false-positive a "change" when
- * comparing a loaded spec against a freshly-parsed one.
+ * comparing a loaded spec against a freshly-parsed one. Also reused as the
+ * canonical hash key for persona golden-sets (see evals/personaGen.ts).
  */
-function j(v: unknown): string {
+export function stableStringify(v: unknown): string {
   if (typeof v === "string") return v;
   return JSON.stringify(v, (_, val) =>
     val && typeof val === "object" && !Array.isArray(val)
@@ -46,7 +47,7 @@ export function diffSpecs(before: AgentSpec | null, after: AgentSpec): SpecDiff 
   }
 
   const cmp = (path: string, b: unknown, a: unknown, label: string) => {
-    if (j(b) !== j(a)) {
+    if (stableStringify(b) !== stableStringify(a)) {
       changes.push({ path, before: b, after: a });
       summary.push(label);
     }
@@ -58,7 +59,7 @@ export function diffSpecs(before: AgentSpec | null, after: AgentSpec): SpecDiff 
   cmp("identity.firstMessage", before.identity.firstMessage, after.identity.firstMessage, "Updated first message.");
   cmp("goal", before.goal, after.goal, "Updated goal.");
 
-  if (j(before.qualification) !== j(after.qualification)) {
+  if (stableStringify(before.qualification) !== stableStringify(after.qualification)) {
     changes.push({ path: "qualification", before: before.qualification, after: after.qualification });
     const bc = before.qualification.criteria.length;
     const ac = after.qualification.criteria.length;
@@ -69,12 +70,12 @@ export function diffSpecs(before: AgentSpec | null, after: AgentSpec): SpecDiff 
     );
   }
 
-  if (j(before.actions) !== j(after.actions)) {
+  if (stableStringify(before.actions) !== stableStringify(after.actions)) {
     changes.push({ path: "actions", before: before.actions, after: after.actions });
     summary.push(`Tools: ${after.actions.join(", ") || "(none)"}.`);
   }
 
-  if (j(before.guardrails) !== j(after.guardrails)) {
+  if (stableStringify(before.guardrails) !== stableStringify(after.guardrails)) {
     changes.push({ path: "guardrails", before: before.guardrails, after: after.guardrails });
     summary.push(`Guardrails: ${after.guardrails.length} rule(s).`);
   }
