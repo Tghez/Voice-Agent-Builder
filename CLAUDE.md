@@ -88,8 +88,13 @@ lib/
   db/client.ts          serviceClient() (tolerant of pasted /rest/v1 URL)
   db/types.ts           row types (AgentRow, CallRow, StructuredOutcome, IntentResult, ...)
   db/repositories/      agents, calls, evals (typed data access — no raw queries elsewhere)
-  evals/personas.ts     10 personas w/ ground-truth attributes + roleplay briefs
-  evals/runner.ts       LLM-as-lead ↔ agent (same prompt+tools, real tool exec) + LLM-as-judge
+  evals/types.ts        shared eval vocabulary (Persona, CaseSlot, scores, summaries) — types-only
+  evals/casePlan.ts     buildCasePlan(spec)→ EXACTLY 10 deterministic slots + sampleValues() (unit-tested, NO LLM)
+  evals/personaGen.ts   fleshOutPersonas() = ONE structured LLM call for prose; specHashForPersonaSet()
+  evals/personaSet.ts   getOrCreatePersonaSet() golden set — persisted, regen only on spec-hash change
+  evals/failureReasons.ts derive human failure reasons from case scores (shared: summary list + drawer)
+  evals/runner.ts       LLM-as-lead ↔ agent (same prompt+tools, real tool exec); qualification ground
+                        truth = scoreFit on persona attributes (NO LLM); judge only checks guardrails
   llm/client.ts         shared Anthropic client (getAnthropic()), wrapped with LangSmith's
                         wrapAnthropic — traces every call, nested under the current
                         LangGraph node when invoked inside builderGraph.invoke()
@@ -102,7 +107,9 @@ app/
   api/calls/route.ts    POST place call (requires confirm:true, 428 otherwise) + GET list
   api/vapi/tools/route.ts   runtime tool webhook (message.toolCallList → {results})
   api/vapi/events/route.ts  end-of-call webhook (persist first, then Track-2 intent)
-  api/evals/route.ts    POST run harness / GET list runs
+  api/evals/route.ts    POST run harness / GET list runs (or GET ?caseId= for one full case → drawer)
+  api/evals/prepare/route.ts POST ensure the golden persona set exists/is-current (the only LLM-gen step)
+  app/evals/components/EvalCaseDrawer.tsx  per-case detail slide-over (persona · fit · guardrails · transcript)
   api/leads|agents/route.ts GET lists for the UI
 components/Nav.tsx       top nav
 ```
@@ -118,8 +125,11 @@ components/Nav.tsx       top nav
 - `0001_init.sql` = schema. `0002_grants.sql` = table grants (Supabase default grants
   can be missing → symptom "42501 permission denied"). `0003_remove_agent_versioning.sql`
   = dropped the old `agent_specs` version history + `agents.current_version` +
-  `eval_runs.spec_version` in favor of a single `agents.spec` column. Run all in the
-  SQL editor, in order.
+  `eval_runs.spec_version` in favor of a single `agents.spec` column.
+  `0004_eval_persona_sets.sql` = adds `agents.persona_set` (jsonb golden set) +
+  `agents.persona_set_spec_hash`, widens `eval_cases.persona` to jsonb (full persona
+  object per run), and truncates the eval tables (old generic-persona runs aren't
+  comparable to the new spec-grounded harness). Run all in the SQL editor, in order.
 
 ## Models & env (`src/lib/env.ts` is the ONLY place to read env)
 
