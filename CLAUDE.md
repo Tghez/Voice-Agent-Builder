@@ -217,17 +217,7 @@ components/Nav.tsx       top nav
 
 ## Known gaps / TODO
 
-- **Public URL for webhooks.** `NEXT_PUBLIC_BASE_URL=localhost`, so during a real call
-  Vapi can't reach `/api/vapi/tools` or `/api/vapi/events` — tools/qualify/book/transcript
-  won't run. Fix: `ngrok http 3000` (or deploy to Vercel), set `NEXT_PUBLIC_BASE_URL`, and
-  **recompile the assistant** (any builder edit re-runs the compiler and updates `server.url`;
-  existing assistants still point at localhost until re-compiled).
 - **README + Loom** — not written yet (graded deliverables). Deferred at user request.
-- **Conversation persistence across reloads** — memory is in-session (client supplies the
-  transcript). The spec persists via `agentId`; the raw chat does not. A `conversations`
-  table would fix it if wanted.
-- **Cartesia voice IDs** — real IDs mapped in `vapiMap.ts` but not per-voice audited.
-- **Test agents accumulate** in Vapi/DB from smoke runs (no cleanup routine).
 - **Builder on Haiku** currently (user override) — restore `claude-sonnet-5` for the demo.
 
 ## Conventions
