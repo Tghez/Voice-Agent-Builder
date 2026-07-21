@@ -25,22 +25,26 @@ const RouteSchema = z.object({
 });
 
 const SYSTEM = `You route messages sent to a builder that creates/edits a voice sales agent via natural language. Classify the user's latest message:
-- "edit": they want to create or change the agent's config (identity, goal, qualification criteria, tools, guardrails). e.g. "make her friendlier", "qualify on team size ≥ 10", "add a callback tool".
-- "question": they're asking about the current agent/spec. e.g. "what criteria does it use?", "show the prompt".
+- "edit": they want to create or change the agent's configuration (identity, goal, qualification criteria, guardrails). e.g. "make her friendlier", "qualify on team size ≥ 10", "never quote pricing".
+- "question": they're asking about the current agent/configuration. e.g. "what criteria does it use?", "show the prompt".
 - "test_call": they want to place/test a call. e.g. "call lead 3", "test it on Jordan".
 - "chitchat": greetings or anything else.
 Prefer "edit" when they express a desired change to the agent. If the assistant's previous message asked a clarifying question and the user's latest message answers it (e.g. provides the criteria that were requested), classify as "edit".
 
-For "edit" routes only, also decide needsClarification: true ONLY when the request is underspecified on something that MATTERS and you cannot reasonably fill it with a sensible default. Three things that always matter:
-1. What product/company/business the agent is selling or representing. If neither the current message nor any earlier turn in this conversation has established that, needsClarification is true — the agent can't have a goal, persona, or qualification criteria in a vacuum.
-2. The agent's own name — it needs something to call itself when it greets a lead. If neither the current message nor any earlier turn has given the agent a name, needsClarification is true.
-3. What makes a lead qualified. If the CURRENT spec has no qualification criteria yet, and neither the current message nor any earlier turn has given any (e.g. "qualify leads" with no criteria given), needsClarification is true — there is no reasonable default for who counts as a good lead. This does not apply once the spec already has criteria (a later edit to unrelated fields doesn't need to re-litigate qualification).
-4. The unit or time period of a NEW quantitative qualification threshold, when that unit materially changes what the criterion means and there's no reasonable default. e.g. "qualify by budget over $100" is ambiguous — $100 per month, per year, or total? — so needsClarification is true. Likewise a bare duration/frequency threshold ("contract length over 6" — months? years?). This applies even when the spec already has other criteria: it's about THIS threshold being ambiguous, not about whether qualification exists at all. Do NOT flag thresholds whose unit is self-evident (e.g. "team size ≥ 10" is a plain head count, "budget over $100k/year" already states the period).
-If earlier in this conversation you already asked a clarifying question (about the business, the name, qualification criteria, or a threshold's unit/period) and the user's latest message answers it, needsClarification is false — proceed with what they told you. For "question", "test_call", and "chitchat" routes, needsClarification is always false.`;
+For "edit" routes only, also decide needsClarification: true ONLY when the request is underspecified on something that MATTERS and you cannot reasonably fill it with a sensible default. The configuration state given below is ground truth for the agent's name and qualification criteria — trust it over your reading of the transcript.
+
+Three facts are load-bearing, and NONE has an acceptable default — you must never invent, guess, or fill one in yourself. Flag needsClarification when one is absent from ALL of {the current message, any earlier turn, the configuration state below} — and a fact the user supplied when answering a question you asked earlier counts as present, so never re-ask for it:
+1. The product/company/business the agent is selling or representing — without it the agent has no goal, persona, or qualification criteria to stand on. (This never appears in the configuration state, so it must come from the conversation.)
+2. The agent's own name — it needs something to call itself when it greets a lead.
+3. What makes a lead qualified — there is no reasonable default for who counts as a good lead. (Once the configuration already has criteria, an unrelated edit does NOT re-litigate qualification.)
+
+Also flag needsClarification when the user sets a NEW quantitative qualification threshold whose unit or time period is ambiguous and materially changes what the criterion means, with no reasonable default — e.g. "budget over $100" (per month? per year? total?) or a bare duration/frequency ("contract length over 6" — months? years?). This holds even when other criteria already exist: it's about THIS threshold being ambiguous, not whether qualification exists. Do NOT flag thresholds whose unit is self-evident ("team size ≥ 10" is a plain head count; "budget over $100k/year" already states the period).
+
+For "question", "test_call", and "chitchat" routes, needsClarification is always false.`;
 
 export async function routerNode(state: BuilderState): Promise<Partial<BuilderState>> {
   const spec = state.workingSpec;
-  const specNote = `Current spec ground truth (may already satisfy a gap even if the conversation text doesn't spell it out): agent name is ${spec.identity.name ? `set ("${spec.identity.name}")` : "NOT set"}; qualification criteria: ${spec.qualification.criteria.length > 0 ? `${spec.qualification.criteria.length} defined` : "NONE defined"}.`;
+  const specNote = `Configuration state (ground truth — may already satisfy a gap even if the conversation text doesn't spell it out): agent name is ${spec.identity.name ? `set ("${spec.identity.name}")` : "NOT set"}; qualification criteria: ${spec.qualification.criteria.length > 0 ? `${spec.qualification.criteria.length} defined` : "NONE defined"}.`;
   const resp = await getAnthropic().messages.parse({
     model: env.builderModel(),
     max_tokens: 300,

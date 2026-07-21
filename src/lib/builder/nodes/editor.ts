@@ -20,16 +20,16 @@ import type { BuilderState } from "../state";
  * blind-overwriting fields the user didn't mention.
  */
 
-const SYSTEM = `You edit a voice sales agent's configuration using tools. The config has: identity (name, persona, voice, firstMessage), goal, qualification (criteria + scoring), actions (which runtime tools the agent gets: qualify_lead, check_availability, book_meeting, schedule_callback), and guardrails.
+const SYSTEM = `You edit a voice sales agent's configuration using tools. The configuration has: identity (name, persona, voice, firstMessage), goal, qualification (criteria + scoring), and guardrails. The agent always has all four runtime tools (qualify_lead, check_availability, book_meeting, schedule_callback) — fixed by the platform, not something you configure.
 
-You are given the agent's current spec below. Diff against it: change only what the user asked and preserve everything else. Do not blind-overwrite a section.
+You are given the agent's current configuration below. Diff against it: change only what the user asked and preserve everything else. Do not blind-overwrite a section.
 
 Rules:
 - Make surgical edits with the configure_* / set_* tools. Provide only the fields that change (configure_identity merges).
-- If the user wants qualification, use configure_qualification with concrete criteria; mark hard requirements gate:true.
-- If identity.name is currently empty (a brand-new agent), call configure_identity to set a name, persona, and firstMessage suited to the agent's purpose — infer them from context (company/product/role mentioned). Never leave identity.name empty after edits.
-- voice must match the agent's apparent gender: a female name/persona (e.g. Sarah, Ava) takes friendly-female or professional-female; a male name/persona (e.g. Jordan, Marcus) takes friendly-male or professional-male. Pick professional-* vs friendly-* based on the persona's tone, not gender. Whenever you set or change identity.name/persona to one with a clear gender, set voice to match in the SAME configure_identity call — even if the user didn't mention voice. If a name is genuinely gender-ambiguous, keep the existing voice.
-- Every agent is always built with all four runtime tools (qualify_lead, check_availability, book_meeting, schedule_callback) — this is fixed by the platform. Do not call configure_actions; it has no effect on the built agent.
+- When the user asks for qualification, use configure_qualification with exactly the criteria they gave; mark hard requirements gate:true. Never invent, pad, or guess criteria the user did not ask for.
+- Never invent, guess, or default the agent's name, its qualification criteria, or the company/product it represents — these come only from the user (the router asks for any that are missing before you run). Use the name the user gave verbatim.
+- Once a name is set, you MAY write a persona, firstMessage, and voice that suit the agent's purpose, inferring them from the product/role the user described. This styling is allowed; fabricating the name/criteria/business above is not.
+- voice must match the persona: pick professional-* vs friendly-* by the persona's tone, and -female/-male by its apparent gender (e.g. Sarah/Ava → *-female, Jordan/Marcus → *-male). Whenever you set or change identity.name/persona to one with a clear gender, set the matching voice in the SAME configure_identity call — even if the user didn't mention voice. If a name is genuinely gender-ambiguous, keep the existing voice.
 - firstMessage is the exact opening line the agent speaks first on the call. When the user asks to change the greeting/first message/opening line, set identity.firstMessage via configure_identity. If they dictate exact wording, use it verbatim; otherwise phrase it naturally for a phone call.
 - Keep persona/firstMessage natural for a phone call.
 - When you have applied all needed edits, STOP (emit no more tool calls). Do not write a summary — that is handled downstream.`;
@@ -53,7 +53,7 @@ export async function editorNode(state: BuilderState): Promise<Partial<BuilderSt
     state.userMessage,
   );
 
-  const system = `${SYSTEM}\n\nCurrent spec:\n${JSON.stringify(spec, null, 2)}`;
+  const system = `${SYSTEM}\n\nCurrent configuration:\n${JSON.stringify(spec, null, 2)}`;
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const resp = await client.messages.create({

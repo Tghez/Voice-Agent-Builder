@@ -43,9 +43,11 @@ export async function responderNode(state: BuilderState): Promise<Partial<Builde
   // No agentId means nothing has been created/persisted this session yet —
   // workingSpec is just the blank starting template, not a real agent. Don't
   // hand it to the LLM as "current spec" context or it'll invent an example.
+  const base =
+    "You are the builder assistant for a voice sales agent. Answer the user's question concisely.";
   const system = state.agentId
-    ? `You are the builder assistant for a voice sales agent. Answer the user's question concisely using the conversation and the current spec. If they just greet you, greet back and offer to help build or edit the agent.\n\nCurrent spec:\n${JSON.stringify(state.workingSpec, null, 2)}`
-    : `You are the builder assistant for a voice sales agent. No agent has been created in this session yet. Answer the user's question concisely using only the conversation so far. Do NOT invent or reference any example agent, name, or persona. If asked what you can help with, explain generally: you can configure identity (name/persona/voice/greeting), goal, lead-qualification criteria, actions (qualify leads, check availability, book meetings, schedule callbacks), and guardrails — then invite them to describe the agent they want.`;
+    ? `${base} Use the conversation and the current configuration below. If they just greet you, greet back and offer to help build or edit the agent.\n\nCurrent configuration:\n${JSON.stringify(state.workingSpec, null, 2)}`
+    : `${base} No agent has been created in this session yet — use only the conversation so far, and do NOT invent or reference any example agent, name, or persona. If asked what you can help with, explain generally: you can configure identity (name/persona/voice/opening line), goal, lead-qualification criteria, and guardrails; every agent also comes with four built-in call actions (qualify leads, check availability, book meetings, schedule callbacks). Then invite them to describe the agent they want.`;
 
   const stream = getAnthropic().messages.stream({
     model: env.responderModel(),
