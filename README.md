@@ -12,11 +12,9 @@
 
 ---
 
-## 📹 Demo
+## 🖥️ The three surfaces
 
-> **Video walkthrough:** _<add link>_
-
-Three surfaces, one shared artifact:
+Three screens, one shared artifact:
 
 | Surface | Route | What it does |
 | --- | --- | --- |
@@ -81,7 +79,7 @@ flowchart LR
 
 **Four decisions worth calling out:**
 
-1. **Edit is first-class, not create-then-overwrite.** The editor is handed the *current spec directly in its system prompt* (it's already in state — no read round-trip). So `"make her friendlier"` diffs against real state instead of blind-overwriting the qualification criteria the user set five turns ago. The tier-1 eval below asserts exactly this.
+1. **Edit is first-class, not create-then-overwrite.** The editor is handed the *current spec directly in its system prompt* (it's already in state — no read round-trip). So `"make her friendlier"` diffs against real state instead of blind-overwriting the qualification criteria the user set five turns ago. The builder-eval suite below asserts exactly this.
 2. **Compile once per turn, never per tool call.** The compiler is a graph edge downstream of the editor loop, so a turn that touches four fields still produces **exactly one** Vapi `PATCH` — and zero when nothing changed.
 3. **Session memory without a checkpointer.** The client sends the full chat history; every node threads it through `historyToMessages()`. The clarifier therefore remembers the question it asked, and an answer to it routes as `edit`, not as a fresh under-specified request.
 4. **Three facts are never invented.** The agent's *name*, its *qualification criteria*, and the *business it represents* have no acceptable default. The router flags any that are missing and the clarifier asks — the editor is explicitly forbidden from filling them in. It also catches ambiguous thresholds (`"budget over $100"` → per month? per year?).
@@ -152,18 +150,26 @@ The same rule applies to Vapi's own end-of-call structured extraction: it may on
 
 ---
 
-## 🧪 Evals — two tiers
+## 🔬 Evals, part 1 — testing the **builder** (my harness, not shipped)
 
-Two agents were built, so two things need evaluating. Both keep the LLM judge as small as possible.
+> **Who runs this:** me, from the CLI, while developing. **Question it answers:** *did my last prompt change break the builder?*
 
-### Tier 1 — the **builder** agent ([`src/lib/builder-eval/`](src/lib/builder-eval/)) · `npm run eval:builder`
+The builder is itself an LLM system, so every prompt tweak to the router or editor risks silently regressing behavior I'd already gotten right. This suite is my regression net. It never ships to the user and never appears in the UI.
 
-21 cases with **fully objective ground truth — no judge at all.** Each runs through a side-effect-free graph (router → maybe editor, no compiler ⇒ no Vapi write, no DB write).
+**`npm run eval:builder`** — 21 cases, [`src/lib/builder-eval/`](src/lib/builder-eval/). Ground truth is **fully objective, so there is no LLM judge at all.** Each case runs through a trimmed graph (router → maybe editor, **no compiler**), which makes the whole suite side-effect-free: no Vapi `PATCH`, no DB write, safe to run on a whim.
 
-- **Router track (15 cases)** — hand-authored gold labels for `route` + `needsClarification`. Includes paired A/B cases on the same fixture (`"budget over 100"` must clarify · `"a sales team of at least 25"` must not) and a session-memory case (answering the clarifier's own question must not re-ask).
-- **Edit track (6 cases)** — one NL instruction against a known spec, asserted on the deterministic `diffSpecs`: the intended paths **must** change and the load-bearing rest **must not**. This is how "surgical edits" stops being a claim and becomes a test.
+- **Router track (15 cases)** — hand-authored gold labels for `route` + `needsClarification`. Includes paired A/B cases on the same fixture (`"budget over 100"` **must** clarify · `"a sales team of at least 25"` **must not**) and a session-memory case (answering the clarifier's own question must not re-ask it).
+- **Edit track (6 cases)** — one NL instruction against a known spec, asserted on the deterministic `diffSpecs`: the intended paths **must** change and the load-bearing rest **must not**. This is how *"the builder makes surgical edits"* stops being a claim in a README and becomes something that fails a run.
 
-### Tier 2 — the **voice** agent ([`src/lib/evals/`](src/lib/evals/)) · `/evals` or `npm run eval:smoke`
+**`npm test`** — 61 unit tests / 10 files, all green. Every deterministic surface is pinned: the compiler is asserted **byte-identical** for a given spec, plus fit scoring, the case plan (`sampleValues` checked against `meetsCriterion`), the runtime tools, the spec diff, the providers, and the call payload builder.
+
+---
+
+## 📊 Evals, part 2 — testing the **voice agent** (a feature the user runs)
+
+> **Who runs this:** the user, from `/evals`, after building an agent. **Question it answers:** *does the agent I just described in chat actually work — before I spend money dialing real people?*
+
+This one is a **product surface**, not a dev tool. Someone who has only ever described their agent in English has no way to know whether it enforces the gate they asked for, or quietly quotes pricing when a lead pushes. Clicking **Run evaluation** puts the agent through 10 simulated calls in a couple of minutes, for a fraction of the cost of one real one — and the case set is derived from *their* spec, so it re-targets itself whenever they edit the agent.
 
 An LLM-as-lead roleplays a persona in text against the agent running on the **same compiled prompt and the same runtime tools, executed for real** through the `ToolSession` seam — no phone call, no Vapi spend.
 
@@ -186,15 +192,13 @@ spec ──▶ buildCasePlan()      EXACTLY 10 deterministic slots, pure functio
 
 **Ground truth is deterministic.** Whether a persona *should* qualify is computed by `scoreFit` over the persona's true attributes — the exact function the live agent runs. So the judge LLM is left with only the genuinely semantic question: *did the agent hold its guardrails?* (and it's skipped entirely when there are none).
 
-A case passes on three independent checks: **qualification correct** (agent's verdict == deterministic truth) · **action correct** (qualified ⇒ meeting booked; unqualified ⇒ callback scheduled) · **guardrails held**. The UI reports pass rate, qualification accuracy, book rate, and guardrail violations, with a drawer showing the persona, the fit breakdown, and the full transcript.
+A case passes on three independent checks: **qualification correct** (agent's verdict == deterministic truth) · **action correct** (qualified ⇒ meeting booked; unqualified ⇒ callback scheduled) · **guardrails held**. The page reports pass rate, qualification accuracy, book rate, and guardrail violations, with a per-case drawer showing the persona, the fit breakdown, and the full transcript — so a failure is diagnosable, not just a red dot. `npm run eval:smoke` runs a cut-down version from the CLI.
 
-### Tier 0 — unit tests · `npm test`
+---
 
-**61 tests / 10 files**, all green. Every deterministic surface is pinned: the compiler is asserted **byte-identical** for a given spec, plus fit scoring, the case plan (`sampleValues` is checked against `meetsCriterion`), the runtime tools, the spec diff, the providers, and the call payload builder.
+## 🔭 Observability
 
-### Observability
-
-Every LLM call goes through `getAnthropic()`, wrapped with LangSmith's `wrapAnthropic`. Inside a graph invocation each node is its own child run, so **one builder turn is one nested trace** with per-phase timing and token usage. Tier-1 eval cases are wrapped in named `traceable`s. Leaving `LANGSMITH_TRACING` unset is a silent no-op — no code path changes.
+Every LLM call goes through `getAnthropic()`, wrapped with LangSmith's `wrapAnthropic`. Inside a graph invocation each node is its own child run, so **one builder turn is one nested trace** with per-phase timing and token usage. Builder-eval cases are wrapped in named `traceable`s. Leaving `LANGSMITH_TRACING` unset is a silent no-op — no code path changes.
 
 ---
 
@@ -246,8 +250,8 @@ npm run dev                    # http://localhost:3000 + pinned ngrok tunnel
 | `npm test` | 61 unit tests |
 | `npm run build` | Production build |
 | `npm run seed` | Seed the 10 leads |
-| `npm run eval:builder` | Tier-1 builder evals (21 cases) |
-| `npm run eval:smoke` | Tier-2 harness sanity check |
+| `npm run eval:builder` | Builder evals — my regression suite (21 cases) |
+| `npm run eval:smoke` | Voice-agent eval harness, CLI sanity check |
 | `npm run builder:smoke` | Create + surgically edit an agent, end to end |
 | `npm run memory:smoke` | Clarifier asks → user answers → proceeds without re-asking |
 
@@ -263,7 +267,7 @@ npm run dev                    # http://localhost:3000 + pinned ngrok tunnel
 
 **Deliberate scope cuts** — spec **versioning** (one live spec, overwritten in place; a diff is shown per turn instead), **batch calling** (a loop over the existing `initiateCall` — the interesting part is already built), and **auth/multi-tenancy** (single-user demo).
 
-**Where I'd go next:** compare eval runs across spec revisions to show whether an edit actually improved the agent, feed guardrail-violation cases from tier-2 straight back into the builder chat as suggested fixes, and add a Salesforce/HubSpot `CRMProvider` alongside the Supabase one.
+**Where I'd go next:** compare eval runs across spec revisions to show whether an edit actually improved the agent, feed guardrail-violation cases from the voice-agent evals straight back into the builder chat as suggested fixes, and add a Salesforce/HubSpot `CRMProvider` alongside the Supabase one.
 
 ---
 
