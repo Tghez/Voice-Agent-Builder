@@ -48,7 +48,7 @@ export async function responderNode(state: BuilderState): Promise<Partial<Builde
     : `You are the builder assistant for a voice sales agent. No agent has been created in this session yet. Answer the user's question concisely using only the conversation so far. Do NOT invent or reference any example agent, name, or persona. If asked what you can help with, explain generally: you can configure identity (name/persona/voice/greeting), goal, lead-qualification criteria, actions (qualify leads, check availability, book meetings, schedule callbacks), and guardrails — then invite them to describe the agent they want.`;
 
   const stream = getAnthropic().messages.stream({
-    model: env.builderModel(),
+    model: env.responderModel(),
     max_tokens: 1024,
     system,
     messages: historyToMessages(state.history, state.userMessage),
@@ -106,7 +106,7 @@ Deterministic summary: ${(state.diff?.summary ?? []).join(" ")}`;
   let streamed = "";
   try {
     const stream = getAnthropic().messages.stream({
-      model: env.builderModel(),
+      model: env.responderModel(),
       max_tokens: 200,
       system: EDIT_SUMMARY_SYSTEM,
       messages: [{ role: "user", content: userMsg }],

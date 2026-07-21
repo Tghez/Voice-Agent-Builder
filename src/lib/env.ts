@@ -25,6 +25,14 @@ export const env = {
   // Anthropic — builder graph + eval judge (SDK, bare alias) and in-call (Vapi, dated snapshot).
   anthropicKey: (): string => required("ANTHROPIC_API_KEY"),
   builderModel: (): string => process.env.BUILDER_MODEL ?? "claude-sonnet-5",
+  /**
+   * Model for the responder node (user-facing replies + edit summaries). Kept
+   * separate from builderModel so the cheap phrasing layer can run on a smaller
+   * model than the reasoning nodes (e.g. Haiku responder, Sonnet builder).
+   * Falls back to whatever builderModel resolves to when unset.
+   */
+  responderModel: (): string =>
+    process.env.RESPONDER_MODEL ?? process.env.BUILDER_MODEL ?? "claude-sonnet-5",
   incallModel: (): string => process.env.INCALL_MODEL ?? "claude-haiku-4-5-20251001",
   /** Bare Haiku alias for direct SDK calls (text-mode evals mirror the voice agent). */
   incallModelSdk: (): string => process.env.INCALL_MODEL_SDK ?? "claude-haiku-4-5",
