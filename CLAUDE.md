@@ -169,7 +169,11 @@ components/Nav.tsx       top nav
 
 ## Commands
 
-- `npm run dev` → http://localhost:3000 (Builder · Dashboard · Evals)
+- `npm run dev` → http://localhost:3000 (Builder · Dashboard · Evals). Also starts the
+  ngrok tunnel Vapi's webhooks call back into (`concurrently` runs `dev:next` +
+  `dev:tunnel`; Ctrl+C stops both). `scripts/tunnel.mjs` pins the reserved domain parsed
+  out of `NEXT_PUBLIC_BASE_URL`, so the public URL is stable and the Vapi webhook config
+  never goes stale. Run `npm run dev:next` for the app alone.
 - `npm test` — vitest (compiler byte-identical, fit scoring, runtime tools, diff, providers, call)
 - `npm run build` — production build (must stay green)
 - `npm run seed` — upsert 10 leads (phone → DEMO_PHONE)
