@@ -19,7 +19,7 @@ const ClarifySchema = z.object({
   question: z.string().describe("One concise, targeted question."),
 });
 
-const SYSTEM = `You gather requirements for a voice sales agent. The router has already determined the LATEST request is underspecified on something that matters and cannot reasonably be filled with a sensible default (e.g. "qualify leads" with no criteria given). Using the full conversation, the current spec, and the router's stated reason for flagging it, ask exactly ONE concise, targeted question that resolves the gap. Trust the router's reason for what's missing rather than re-deriving it from scratch — but use your own judgment if it's off.`;
+const SYSTEM = `You gather requirements for a voice sales agent. The router has already determined the LATEST request is underspecified on something that matters and cannot reasonably be filled with a sensible default — e.g. "qualify leads" with no criteria given, or a quantitative threshold whose unit/period is ambiguous ("qualify by budget over $100" → per month? per year? total?). Using the full conversation, the current spec, and the router's stated reason for flagging it, ask exactly ONE concise, targeted question that resolves the gap. When the gap is a threshold's unit or time period, name the threshold and offer the likely options (e.g. "Is that $100 per month, per year, or a one-time budget?"). Trust the router's reason for what's missing rather than re-deriving it from scratch — but use your own judgment if it's off.`;
 
 export async function clarifierNode(state: BuilderState): Promise<Partial<BuilderState>> {
   const resp = await getAnthropic().messages.parse({
