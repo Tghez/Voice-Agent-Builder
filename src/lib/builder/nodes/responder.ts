@@ -89,7 +89,22 @@ async function editSummary(
   write: ReturnType<typeof getWriter>,
 ): Promise<Partial<BuilderState>> {
   const affordance = " You can view the compiled prompt or place a test call.";
-  const fallback = `Done — ${(state.diff?.summary ?? ["Updated."]).join(" ")}${affordance}`;
+
+  // Deterministic side-effect: did this edit drop the LAST qualification
+  // criterion? With zero criteria the Track-1 fit gate has nothing to screen
+  // on — scoreFit returns passed_gates:true / score 100, so every lead comes
+  // back qualified. Removing criteria is a legitimate request, so we never
+  // block it (per the invariant: warn, don't prevent) — but the user must be
+  // told plainly. Computed here (not left to the summary LLM) so the warning
+  // can't be silently dropped on a flaky turn.
+  const criteriaEmptied =
+    (state.prevSpec?.qualification.criteria.length ?? 0) > 0 &&
+    state.workingSpec.qualification.criteria.length === 0;
+  const warning = criteriaEmptied
+    ? " Heads up: the agent now has no qualification criteria, so it can no longer screen leads — every lead it talks to will come back qualified. Add at least one criterion to start filtering again."
+    : "";
+
+  const fallback = `Done — ${(state.diff?.summary ?? ["Updated."]).join(" ")}${warning}${affordance}`;
 
   const fmt = (v: unknown) => {
     const s = typeof v === "string" ? v : JSON.stringify(v);
@@ -131,6 +146,8 @@ Deterministic summary: ${(state.diff?.summary ?? []).join(" ")}`;
     write?.(fallback);
     return { reply: fallback, done: true };
   }
-  write?.(affordance);
-  return { reply: `${sentence}${affordance}`, done: true };
+  // The warning is appended deterministically (the summary LLM only phrases the
+  // change itself); the affordance follows it.
+  write?.(`${warning}${affordance}`);
+  return { reply: `${sentence}${warning}${affordance}`, done: true };
 }
