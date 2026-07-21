@@ -6,6 +6,7 @@ import { Hero } from "@/components/builder/Hero";
 import { Composer } from "@/components/builder/Composer";
 import { MessagesView } from "@/components/builder/MessagesView";
 import { LeftRail, type TabId } from "@/components/builder/LeftRail";
+import type { ProgressStep } from "@/components/builder/ProgressSteps";
 import type { AgentOption, ChatMessage } from "@/components/builder/types";
 
 export default function BuilderPage() {
@@ -16,6 +17,8 @@ export default function BuilderPage() {
   const [spec, setSpec] = useState<AgentSpec | null>(null);
   const [compiledPrompt, setCompiledPrompt] = useState<string | null>(null);
   const [agents, setAgents] = useState<AgentOption[]>([]);
+  // Live builder progress (editor + compiler) for the in-flight turn.
+  const [steps, setSteps] = useState<ProgressStep[]>([]);
   const [railOpen, setRailOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("agents");
   const started = messages.length > 0;
@@ -122,6 +125,7 @@ export default function BuilderPage() {
     setMessages((m) => [...m, { role: "user", text }, { role: "assistant", text: "" }]);
     setInput("");
     setLoading(true);
+    setSteps([]);
 
     const reveal = revealRef.current;
     if (reveal.timer) clearInterval(reveal.timer);
@@ -172,6 +176,14 @@ export default function BuilderPage() {
 
           if (event === "token") {
             pushToken(parsed.text ?? "");
+          } else if (event === "status") {
+            // Mark all prior steps done, append the new one (done unless it's
+            // still in progress). The checklist hides itself once the reply's
+            // first token lands (the assistant message becomes non-empty).
+            setSteps((prev) => [
+              ...prev.map((s) => ({ ...s, done: true })),
+              { label: parsed.label ?? "", done: !!parsed.done },
+            ]);
           } else if (event === "done") {
             // Reconcile against the authoritative final reply in case it
             // diverges from the summed deltas (e.g. a trimmed fallback).
@@ -195,6 +207,7 @@ export default function BuilderPage() {
               // no "before" to diff against) and only populates `summary` — so
               // check summary, not changes, to catch creation as well as edits.
               if (parsed.diff?.summary?.some((s: string) => s !== "No changes.")) revealIdentity();
+              setSteps([]);
               setLoading(false);
             };
             if (!reveal.pending && !reveal.timer) {
@@ -208,6 +221,7 @@ export default function BuilderPage() {
               reveal.timer = null;
             }
             reveal.pending = "";
+            setSteps([]);
             updateLastMessage({ text: `Error: ${parsed.error}` });
             setLoading(false);
           }
@@ -218,6 +232,7 @@ export default function BuilderPage() {
         clearInterval(reveal.timer);
         reveal.timer = null;
       }
+      setSteps([]);
       updateLastMessage({ text: `Error: ${(e as Error).message}` });
       setLoading(false);
     }
@@ -233,7 +248,13 @@ export default function BuilderPage() {
   return (
     <>
       <Hero started={started} panelOpen={railOpen} />
-      <MessagesView started={started} panelOpen={railOpen} messages={messages} loading={loading} />
+      <MessagesView
+        started={started}
+        panelOpen={railOpen}
+        messages={messages}
+        loading={loading}
+        steps={steps}
+      />
       <Composer
         started={started}
         panelOpen={railOpen}

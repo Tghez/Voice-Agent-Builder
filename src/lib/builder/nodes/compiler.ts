@@ -1,8 +1,10 @@
+import { getWriter } from "@langchain/langgraph";
 import { RealVapiClient } from "@/lib/compiler/vapiClient";
 import { syncSpecToVapi } from "@/lib/compiler/compile";
 import { createAgentWithSpec, getAgent, updateAgentSpec } from "@/lib/db/repositories/agents";
 import { env } from "@/lib/env";
 import { diffSpecs } from "../diff";
+import { emitStatus } from "../progress";
 import type { BuilderState } from "../state";
 
 /**
@@ -11,11 +13,16 @@ import type { BuilderState } from "../state";
  * Skips the Vapi write when nothing changed.
  */
 export async function compilerNode(state: BuilderState): Promise<Partial<BuilderState>> {
+  // Captured synchronously at the top (before any await) per the streaming
+  // convention — it feeds the live progress checklist in the chat.
+  const write = getWriter();
+
   if (!state.changed) {
     return { diff: diffSpecs(state.prevSpec, state.workingSpec) };
   }
 
   const spec = state.workingSpec;
+  const isNew = !state.agentId;
 
   // Editing an existing agent → PATCH the same assistant, don't create a new one.
   if (state.agentId && !spec.vapiAssistantId) {
@@ -23,11 +30,13 @@ export async function compilerNode(state: BuilderState): Promise<Partial<Builder
     if (agent?.vapi_assistant_id) spec.vapiAssistantId = agent.vapi_assistant_id;
   }
 
+  emitStatus(write, "Compiling to voice configuration");
   const { assistantId, vapiObject, spec: synced } = await syncSpecToVapi(
     spec,
     new RealVapiClient(),
     { baseUrl: env.baseUrl() },
   );
+  emitStatus(write, isNew ? "Voice agent created" : "Voice agent synced", true);
 
   const compiledPrompt = vapiObject.model.messages[0].content;
 

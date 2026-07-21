@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Message } from "./Message";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { ProgressSteps, type ProgressStep } from "./ProgressSteps";
 import { RAIL_WIDTH } from "./constants";
 import type { ChatMessage } from "./types";
 
@@ -11,9 +12,11 @@ interface MessagesViewProps {
   panelOpen: boolean;
   messages: ChatMessage[];
   loading: boolean;
+  /** Live builder progress for the in-flight turn (editor + compiler steps). */
+  steps: ProgressStep[];
 }
 
-export function MessagesView({ started, panelOpen, messages, loading }: MessagesViewProps) {
+export function MessagesView({ started, panelOpen, messages, loading, steps }: MessagesViewProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,7 +38,9 @@ export function MessagesView({ started, panelOpen, messages, loading }: Messages
           if (isPendingPlaceholder) return null;
           return <Message key={i} m={m} />;
         })}
-        {loading && messages[messages.length - 1]?.text === "" && <ThinkingIndicator />}
+        {loading &&
+          messages[messages.length - 1]?.text === "" &&
+          (steps.length > 0 ? <ProgressSteps steps={steps} /> : <ThinkingIndicator />)}
         <div ref={endRef} />
       </div>
     </div>

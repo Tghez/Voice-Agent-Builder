@@ -60,7 +60,18 @@ export async function POST(req: Request) {
         );
         for await (const [mode, chunk] of events) {
           if (mode === "custom") {
-            controller.enqueue(encoder.encode(sseEvent("token", { text: chunk })));
+            // The custom channel carries two shapes: plain-string text tokens
+            // (responder/clarifier) and status objects (editor/compiler
+            // progress). Route each to its own SSE event so progress never
+            // lands in the reply text.
+            if (typeof chunk === "string") {
+              controller.enqueue(encoder.encode(sseEvent("token", { text: chunk })));
+            } else if (chunk && typeof chunk === "object" && (chunk as { kind?: string }).kind === "status") {
+              const s = chunk as { label?: string; done?: boolean };
+              controller.enqueue(
+                encoder.encode(sseEvent("status", { label: s.label ?? "", done: !!s.done })),
+              );
+            }
           } else if (mode === "values") {
             finalState = chunk as Partial<BuilderState>;
           }

@@ -1,9 +1,11 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { getWriter } from "@langchain/langgraph";
 import { getAnthropic } from "@/lib/llm/client";
 import { env } from "@/lib/env";
-import { applyToSpec, type BuilderToolName } from "@/lib/spec/apply";
+import { applyToSpec, type BuilderToolName, type SpecSection } from "@/lib/spec/apply";
 import { BUILDER_TOOLS } from "../tools";
 import { historyToMessages } from "../history";
+import { emitStatus, SECTION_STATUS } from "../progress";
 import type { BuilderState } from "../state";
 
 /**
@@ -34,9 +36,15 @@ Rules:
 const MAX_STEPS = 8;
 
 export async function editorNode(state: BuilderState): Promise<Partial<BuilderState>> {
+  // Captured synchronously at the top (before any await) per the streaming
+  // convention — it feeds the live progress checklist in the chat.
+  const write = getWriter();
   const spec = state.workingSpec; // mutated in place
   const client = getAnthropic();
   const toolLog: string[] = [];
+  // Emit each section's progress label at most once, even if the model touches
+  // it in several tool calls.
+  const announced = new Set<SpecSection>();
   // Start from the full session history so the editor applies edits in context
   // (e.g. the criteria the user gave in answer to the clarifier's question).
   const messages: Anthropic.MessageParam[] = historyToMessages(
@@ -67,6 +75,10 @@ export async function editorNode(state: BuilderState): Promise<Partial<BuilderSt
       const r = applyToSpec(spec, { name: tu.name as BuilderToolName, args: tu.input });
       if (r.ok) {
         toolLog.push(`${tu.name} → ${r.section}`);
+        if (!announced.has(r.section)) {
+          announced.add(r.section);
+          emitStatus(write, SECTION_STATUS[r.section]);
+        }
         toolResults.push({
           type: "tool_result",
           tool_use_id: tu.id,
