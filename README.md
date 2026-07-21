@@ -144,7 +144,7 @@ Two details from actually running it:
 | Output | `qualified` / `score` / per-criterion breakdown / a human reason | `intent_score`, `stage`, `urgency`, `signals[]`, `objections[]` |
 | Authority | **Decides the outcome.** Unit-tested, auditable, reproducible. | **Advisory only — never overrides a hard gate.** |
 
-This is the structured/unstructured split the role description describes. Firmographics are a business rule and must be defensible ("failed required gate: sales team of at least 10"), so they get a pure function. Buying intent — urgency, hesitation, buying-stage language — is genuinely semantic, so it gets an LLM. Merging them would make the qualification decision non-reproducible; keeping them apart means an intent score that wobbles 44→48 between runs is harmless, because it decides nothing.
+Firmographics are a business rule and must be defensible ("failed required gate: sales team of at least 10"), so they get a pure function. Buying intent — urgency, hesitation, buying-stage language — is genuinely semantic, so it gets an LLM. Merging them would make the qualification decision non-reproducible; keeping them apart means an intent score that wobbles 44→48 between runs is harmless, because it decides nothing.
 
 The same rule applies to Vapi's own end-of-call structured extraction: it may only *fill in* fields the in-call tools never set (a call that dropped before `qualify_lead` ran), never overwrite them.
 
