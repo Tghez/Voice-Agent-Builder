@@ -16,6 +16,13 @@ export function SpecCard({ spec }: { spec: AgentSpec | null }) {
         <div className="text-black/60 dark:text-white/60 text-[13px]">{spec.identity.persona}</div>
         <div className="text-[12px] text-black/45 dark:text-white/45 mt-1">Voice: {spec.identity.voice}</div>
       </div>
+      {spec.identity.firstMessage && (
+        <Section label="First message">
+          <p className="text-[13px] text-black/70 dark:text-white/70 italic border-l-2 border-black/10 dark:border-white/15 pl-2.5">
+            “{spec.identity.firstMessage}”
+          </p>
+        </Section>
+      )}
       {spec.goal && (
         <Section label="Goal">
           <p className="text-[13px] text-black/70 dark:text-white/70">{spec.goal}</p>
