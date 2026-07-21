@@ -219,11 +219,6 @@ components/Nav.tsx       top nav
 - Git: small legible commits (history is graded); LF enforced via `.gitattributes`;
   co-author trailer `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
-## Known gaps / TODO
-
-- **README + Loom** — not written yet (graded deliverables). Deferred at user request.
-- **Builder on Haiku** currently (user override) — restore `claude-sonnet-5` for the demo.
-
 ## Conventions
 
 - Path alias `@/*` → `src/*`. All env access via `src/lib/env.ts`. All DB access via
