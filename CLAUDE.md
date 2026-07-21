@@ -7,6 +7,8 @@ voice AI sales agent in natural language. The generated voice agent calls leads,
 qualifies them, and books meetings. (Alta AI-Engineer take-home.)
 
 **Live repo:** https://github.com/Tghez/Voice-Agent-Builder (branch `main`).
+`README.md` is the reviewer-facing doc (setup + architecture narrative); this file is the
+working guide — invariants, module map, gotchas.
 
 ## The one idea: spec-as-contract
 
@@ -57,6 +59,13 @@ User NL ─▶ BUILDER GRAPH (LangGraph.js, LLM + pure tools) ─▶ AgentSpec (
    every LLM node via `historyToMessages()`). No LangGraph checkpointer — "fresh
    invocation over full history." The clarifier remembers its own question; follow-ups
    resolve against context.
+7. **Two eval tracks, different subjects — keep them apart.**
+   - `lib/evals/` grades the **voice agent** (LLM-as-lead vs the compiled agent; fit
+     ground truth deterministic, judge only checks guardrails).
+   - `lib/builder-eval/` grades the **builder** (did the router label the turn right,
+     did the editor change exactly the intended spec fields). Objective gold labels +
+     `diffSpecs` — NO judge. It runs on a compiler-less mirror of the real graph and
+     must stay side-effect-free: never PATCH Vapi, never write the DB.
 
 ## Module map (`src/`)
 
@@ -75,6 +84,8 @@ lib/
     tools.ts            configure_* / set_* write tools (Anthropic tool defs)
     history.ts          historyToMessages(history, current)
     diff.ts             stable (key-order-insensitive) spec diff
+    progress.ts         BuilderStatus chunks (kind:"status") onto the custom stream channel
+                        → SSE "status" events; drives the chat's live checklist
     nodes/*.ts          router, clarifier, editor(pure-tool loop), compiler, responder, testRunner
   scoring/fit.ts        Track-1 deterministic (unit-tested)
   scoring/intent.ts     Track-2 advisory (structured output)
@@ -95,23 +106,43 @@ lib/
   evals/failureReasons.ts derive human failure reasons from case scores (shared: summary list + drawer)
   evals/runner.ts       LLM-as-lead ↔ agent (same prompt+tools, real tool exec); qualification ground
                         truth = scoreFit on persona attributes (NO LLM); judge only checks guardrails
+  builder-eval/         ★ the OTHER eval track — grades the BUILDER, not the voice agent
+    cases.ts            hand-authored tier-1 cases + spec fixtures; objective gold labels, NO judge
+    graph.ts            compiler-less mirror of builderGraph (router → maybe editor → END):
+                        reuses the REAL nodes, so runs are side-effect-free (no Vapi PATCH, no DB)
+    runner.ts           runs each case; asserts router labels + deterministic diffSpecs
+                        (intended fields changed, rest untouched). Traces to the
+                        `builder-eval` LangSmith project; flushes the client before exit
+  transcript.ts         shared calls.transcript parser (array-of-turns | string) — intent + dashboard
+  evalRunStore.ts       client-side module-scope run store so an eval run survives navigation
+                        away from /evals (useEvalRun(); not a full page reload)
   llm/client.ts         shared Anthropic client (getAnthropic()), wrapped with LangSmith's
                         wrapAnthropic — traces every call, nested under the current
                         LangGraph node when invoked inside builderGraph.invoke()
   env.ts                single typed source for ALL env access
 app/
-  page.tsx              Builder chat (diff chips, view-compiled-prompt, live spec panel, sends history)
-  dashboard/page.tsx    leads (CRM look) + confirm-gated Call + calls view + aggregates
+  page.tsx              Builder chat shell — SSE parsing + state only; UI lives in components/builder/
+  dashboard/page.tsx    leads (CRM look) + confirm-gated Call (phone or browser) + calls + aggregates
   evals/page.tsx        run harness + per-case pass/fail
+  dashboard/components/ AgentRail · LeadsPanel · CallsTable · CallDetailDrawer · KpiRow ·
+                        ConfirmCallDialog · ui.tsx (shared primitives)
+  evals/components/     EvalCaseDrawer (per-case slide-over: persona · fit · guardrails · transcript) ·
+                        RunningBanner (live phase + elapsed, backed by evalRunStore)
   api/builder/route.ts  one chat turn → graph.stream() as SSE (loads spec by agentId, accepts history)
   api/calls/route.ts    POST place call (requires confirm:true, 428 otherwise) + GET list
+  api/calls/web/route.ts POST register a BROWSER-placed call (Vapi Web SDK started it client-side;
+                        this only writes the row so it lands on the dashboard with the right lead)
   api/vapi/tools/route.ts   runtime tool webhook (message.toolCallList → {results})
   api/vapi/events/route.ts  end-of-call webhook (persist first, then Track-2 intent)
   api/evals/route.ts    POST run harness / GET list runs (or GET ?caseId= for one full case → drawer)
   api/evals/prepare/route.ts POST ensure the golden persona set exists/is-current (the only LLM-gen step)
-  app/evals/components/EvalCaseDrawer.tsx  per-case detail slide-over (persona · fit · guardrails · transcript)
   api/leads|agents/route.ts GET lists for the UI
-components/Nav.tsx       top nav
+  api/agents/[id]/route.ts  GET one agent + spec + compiled prompt (Builder loads an existing agent)
+components/Nav.tsx      top nav (also surfaces a running eval via useEvalRun())
+components/builder/     Builder chat UI, decomposed: LeftRail (Agents · Identity · Prompt tabs) ·
+                        AgentsPanel · SpecCard · PromptPanel · MessagesView · Message · Composer ·
+                        Hero · ProgressSteps · ThinkingIndicator · FormattedText · Section ·
+                        constants · types
 ```
 
 ## Data model (Supabase; `supabase/migrations/`)
@@ -133,17 +164,22 @@ components/Nav.tsx       top nav
 
 ## Models & env (`src/lib/env.ts` is the ONLY place to read env)
 
-- `BUILDER_MODEL` — builder graph nodes (router/clarifier/editor/responder, SDK),
-  eval judge + LLM-as-lead, Track-2 intent. Code default `claude-sonnet-5`.
-  **Currently overridden to `claude-haiku-4-5-20251001` in .env.local to save tokens
-  while testing** — Haiku 4.5 supports structured outputs so it works, but is weaker
-  at editor reasoning + judging. Switch back to `claude-sonnet-5` for the real demo/evals.
+- `BUILDER_MODEL` — the reasoning nodes (router/clarifier/editor, SDK), eval judge +
+  LLM-as-lead, Track-2 intent. Code default and current `.env.local` value: `claude-sonnet-5`.
+- `RESPONDER_MODEL` — the responder node only (user-facing replies + edit summaries).
+  Split out deliberately: phrasing is cheap, so it runs on Haiku
+  (`claude-haiku-4-5-20251001` in `.env.local`) while the reasoning nodes stay on Sonnet.
+  Falls back to `BUILDER_MODEL` when unset.
 - `INCALL_MODEL` — passed to **Vapi's** anthropic provider. MUST be the DATED snapshot
   `claude-haiku-4-5-20251001` (Vapi rejects the bare alias with 400). The compiler owns this.
-- `incallModelSdk()` = bare `claude-haiku-4-5` — the eval harness's agent side (direct SDK).
+- `incallModelSdk()` (`INCALL_MODEL_SDK`) = bare `claude-haiku-4-5` — the eval harness's
+  agent side (direct SDK), so text-mode evals mirror the voice agent.
 - Other env: `ANTHROPIC_API_KEY`, `VAPI_API_KEY`, `VAPI_PHONE_NUMBER_ID`,
+  `NEXT_PUBLIC_VAPI_PUBLIC_KEY` (client-side key for the Web SDK — browser calls),
   `NEXT_PUBLIC_SUPABASE_URL` (base URL, no /rest/v1), `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
   `SUPABASE_SERVICE_ROLE_KEY`, `DEMO_PHONE` (E.164; all leads route here), `NEXT_PUBLIC_BASE_URL`,
+  `DEMO_EMAIL` (real inbox every Cal.com booking's attendee routes to — seed leads use
+  `.example` addresses, which Cal.com rejects as undeliverable with a 400),
   `CALCOM_API_KEY`/`CALCOM_EVENT_TYPE_ID` (optional — mock calendar used when unset).
 - `.env.local` is gitignored (only `.env.example` is committed). It was created from the
   template and filled in by the user.
@@ -161,11 +197,13 @@ components/Nav.tsx       top nav
   `getWriter()?.(chunk)` — call `getWriter()` ONCE synchronously at the top of the node
   (before any `await`/event-callback) and reuse the returned function; re-deriving it
   inside a later callback (e.g. an Anthropic `stream.on("text", ...)` handler) can miss
-  the AsyncLocalStorage context. The API route interleaves `"token"` SSE events (custom
-  chunks) with a final `"done"` event carrying the last `"values"` snapshot (route, diff,
-  compiledPrompt, spec, agentId). `src/app/page.tsx` reads the fetch body as a
-  stream and parses `event:`/`data:` blocks by hand (no `EventSource`, since that only
-  supports GET).
+  the AsyncLocalStorage context. The custom channel carries TWO shapes and the route
+  splits them by type: plain strings → `"token"` SSE events (reply text), `BuilderStatus`
+  objects (`kind:"status"`, from `builder/progress.ts`) → `"status"` events (the live
+  checklist) — so progress text never leaks into the assistant's reply. A final `"done"`
+  event carries the last `"values"` snapshot (route, diff, compiledPrompt, spec, agentId);
+  a thrown node sends `"error"`. `src/app/page.tsx` reads the fetch body as a stream and
+  parses `event:`/`data:` blocks by hand (no `EventSource`, since that only supports GET).
 
 ## Commands
 
@@ -174,13 +212,16 @@ components/Nav.tsx       top nav
   `dev:tunnel`; Ctrl+C stops both). `scripts/tunnel.mjs` pins the reserved domain parsed
   out of `NEXT_PUBLIC_BASE_URL`, so the public URL is stable and the Vapi webhook config
   never goes stale. Run `npm run dev:next` for the app alone.
-- `npm test` — vitest (compiler byte-identical, fit scoring, runtime tools, diff, providers, call)
+- `npm test` — vitest, 10 files / 61 tests (compiler byte-identical, fit scoring, runtime
+  tools, spec apply, diff, case plan, persona gen, eval runner, providers, call)
 - `npm run build` — production build (must stay green)
 - `npm run seed` — upsert 10 leads (phone → DEMO_PHONE)
 - `npm run assistant:create` — hand-written spec → real Vapi assistant (Day-1 milestone)
 - `npm run builder:smoke` — create + surgically edit an agent end-to-end
 - `npm run memory:smoke` — clarifier asks → user answers → proceeds without re-asking
-- `npm run eval:smoke` — 2-persona harness sanity check
+- `npm run eval:smoke` — 2-persona voice-agent harness sanity check
+- `npm run eval:builder` — tier-1 BUILDER eval (router labels + surgical-edit diffs);
+  side-effect-free (no Vapi PATCH, no DB write), traces to the `builder-eval` LangSmith project
 - Scripts run via `node --env-file=.env.local --import tsx scripts/X.ts`.
 
 ## Provisioning state (as of this writing)
@@ -189,10 +230,14 @@ components/Nav.tsx       top nav
 - Vapi: number bought in Vapi (not a separate Twilio account), `VAPI_PHONE_NUMBER_ID` set. ✅
 - Anthropic key set; spend caps set in BOTH Vapi and Anthropic consoles. ✅
 - `DEMO_PHONE` set (a real number; every lead routes there — never dials a prospect). ✅
+- `NEXT_PUBLIC_VAPI_PUBLIC_KEY` set — the dashboard can place a call in the browser
+  (Vapi Web SDK) as well as over the phone. ✅
 - Cal.com: `CalcomCalendar` implemented (`src/lib/providers/calendar.ts`, Cal.com API v2).
   `getCalendar()` returns it once `CALCOM_API_KEY` + `CALCOM_EVENT_TYPE_ID` are set, else
-  `MockCalendar`. Google Calendar sync is a Cal.com-side setting (connect the Google
-  Calendar app as the event type's destination calendar) — not app code.
+  `MockCalendar`. Both are set, so bookings are real. ✅ `DEMO_EMAIL` set (Cal.com rejects
+  the seeded `.example` addresses as undeliverable). Google Calendar sync is a Cal.com-side
+  setting (connect the Google Calendar app as the event type's destination calendar) —
+  not app code.
 
 ## Gotchas / lessons (save future debugging)
 
