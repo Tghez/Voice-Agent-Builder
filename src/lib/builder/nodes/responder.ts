@@ -32,12 +32,12 @@ export async function responderNode(state: BuilderState): Promise<Partial<Builde
   }
 
   if (state.route === "edit") {
-    const lines = state.diff?.summary ?? ["Updated."];
-    const reply = state.changed
-      ? `Done — ${lines.join(" ")} You can view the compiled prompt or place a test call.`
-      : "No changes were needed — the spec already matches that.";
-    write?.(reply);
-    return { reply, done: true };
+    if (!state.changed) {
+      const reply = "No changes were needed — the spec already matches that.";
+      write?.(reply);
+      return { reply, done: true };
+    }
+    return editSummary(state, write);
   }
 
   // No agentId means nothing has been created/persisted this session yet —
@@ -64,4 +64,71 @@ export async function responderNode(state: BuilderState): Promise<Partial<Builde
 
   if (!text) write?.("How can I help with your agent?");
   return { reply: text || "How can I help with your agent?", done: true };
+}
+
+const EDIT_SUMMARY_SYSTEM = `You report ONE edit to a voice sales agent's configuration back to the user, in a consultative, advisory tone.
+
+You are given the user's request and the exact fields that changed (path: before → after). Write ONE short sentence (two at most) that:
+- says what changed in plain language, never field paths or JSON ("Made her friendlier", not "identity.persona updated");
+- flags any noteworthy side-effect or implication the user should know but may not have asked about — e.g. a voice swapped to match a new name, a lowered pass score letting more leads qualify, a tightened criterion filtering more out — OR reassures that a related concern is untouched ("qualification unchanged").
+
+Be concrete and brief. No preamble, no greeting, no bullet points, no markdown. Only describe changes present in the diff — never invent one.`;
+
+/**
+ * Phrase the just-applied edit as one consultative sentence that flags
+ * side-effects, instead of relaying the deterministic diff one-liners. The diff
+ * (path + before/after) is already in state from the compiler node, so this is
+ * a single cheap LLM call over the change set — streamed like every other reply.
+ * On any failure it falls back to the deterministic summary so a flaky LLM call
+ * never swallows the confirmation.
+ */
+async function editSummary(
+  state: BuilderState,
+  write: ReturnType<typeof getWriter>,
+): Promise<Partial<BuilderState>> {
+  const affordance = " You can view the compiled prompt or place a test call.";
+  const fallback = `Done — ${(state.diff?.summary ?? ["Updated."]).join(" ")}${affordance}`;
+
+  const fmt = (v: unknown) => {
+    const s = typeof v === "string" ? v : JSON.stringify(v);
+    return s.length > 200 ? `${s.slice(0, 200)}…` : s;
+  };
+  const changeLines = (state.diff?.changes ?? [])
+    .map((c) => `- ${c.path}: ${fmt(c.before)} → ${fmt(c.after)}`)
+    .join("\n");
+  const userMsg = `User asked: "${state.userMessage}"
+
+Fields that changed:
+${changeLines || "(a new agent was created)"}
+
+Deterministic summary: ${(state.diff?.summary ?? []).join(" ")}`;
+
+  let streamed = "";
+  try {
+    const stream = getAnthropic().messages.stream({
+      model: env.builderModel(),
+      max_tokens: 200,
+      system: EDIT_SUMMARY_SYSTEM,
+      messages: [{ role: "user", content: userMsg }],
+    });
+    stream.on("text", (delta) => {
+      streamed += delta;
+      write?.(delta);
+    });
+    await stream.finalMessage();
+  } catch {
+    // Nothing (or a partial) streamed yet → emit the deterministic summary.
+    if (!streamed.trim()) {
+      write?.(fallback);
+      return { reply: fallback, done: true };
+    }
+  }
+
+  const sentence = streamed.trim();
+  if (!sentence) {
+    write?.(fallback);
+    return { reply: fallback, done: true };
+  }
+  write?.(affordance);
+  return { reply: `${sentence}${affordance}`, done: true };
 }
