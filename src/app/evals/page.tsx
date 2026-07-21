@@ -98,20 +98,36 @@ export default function EvalsPage() {
         className="space-y-6 transition-[margin-left] duration-300 ease-out"
         style={{ marginLeft: agentRailOpen ? AGENT_RAIL_WIDTH : "0" }}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold">Evals</h1>
-            <p className="text-xs text-black/50 dark:text-white/50">
-              Spec-grounded harness: 10 personas built from this agent&apos;s own criteria, deterministic
-              qualification ground truth, LLM-as-judge only for guardrails.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
+        <div className="relative overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 bg-gradient-to-br from-black/[0.03] to-transparent dark:from-white/[0.05] dark:to-transparent px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 max-w-2xl">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <span className="grid place-items-center h-8 w-8 rounded-lg bg-black text-white dark:bg-white dark:text-black shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
+                    <path d="m9 11 3 3L22 4" />
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                  </svg>
+                </span>
+                <h1 className="text-2xl font-semibold tracking-tight">Evals</h1>
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-black/[0.06] dark:bg-white/10 text-black/55 dark:text-white/55 truncate">
+                  {agentName}
+                </span>
+              </div>
+              <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
+                Spec-grounded evaluation: 10 personas built from this agent&apos;s own criteria, deterministic
+                qualification ground truth, LLM-as-judge only for guardrails.
+              </p>
+            </div>
             <button
               onClick={() => agentId && runEvaluation(agentId, agentName)}
               disabled={running || !agentId}
-              className="rounded-lg bg-black text-white dark:bg-white dark:text-black px-4 py-2 text-sm font-medium disabled:opacity-40 transition-colors hover:opacity-90 cursor-pointer disabled:cursor-not-allowed"
+              className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-black text-white dark:bg-white dark:text-black px-5 py-2.5 text-sm font-medium shadow-sm disabled:opacity-40 transition-all hover:opacity-90 hover:shadow-md cursor-pointer disabled:cursor-not-allowed disabled:shadow-none"
             >
+              {running && (
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+              )}
               {buttonLabel}
             </button>
           </div>
@@ -214,7 +230,7 @@ export default function EvalsPage() {
 
         {!latest && !running && (
           <div className="text-sm text-black/50 dark:text-white/50">
-            Pick an agent and run the harness to see per-case pass/fail.
+            Pick an agent to run the evaluation.
           </div>
         )}
       </div>
