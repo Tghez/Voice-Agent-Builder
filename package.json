@@ -13,6 +13,7 @@
     "assistant:create": "node --env-file=.env.local --import tsx scripts/createAssistant.ts",
     "builder:smoke": "node --env-file=.env.local --import tsx scripts/builderSmoke.ts",
     "eval:smoke": "node --env-file=.env.local --import tsx scripts/evalSmoke.ts",
+    "eval:builder": "node --env-file=.env.local --import tsx scripts/builderEval.ts",
     "memory:smoke": "node --env-file=.env.local --import tsx scripts/memorySmoke.ts"
   },
   "dependencies": {
